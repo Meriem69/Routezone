@@ -1,0 +1,15 @@
+```
+# Données brutes — trop lourdes pour Git
+bloc1_donnees/data/raw/
+bloc1_donnees/data/processed/
+
+# Base de données SQLite
+*.db
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# VS Code
+.vscode/
