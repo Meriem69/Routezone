@@ -9,14 +9,31 @@ Lancer l'API :
 
 Accéder à la documentation automatique :
     http://localhost:8000/docs
+
+Authentification :
+    Ajouter le header X-API-Key: routezone-secret-2024 à chaque requête.
+    En production, définir la variable d'environnement API_KEY.
 """
 
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 import sqlite3
 import pandas as pd
 from pathlib import Path
 from typing import Optional
+import os
+
+
+# ── Authentification API Key ──────────────────────────────────────
+# En production : définir la variable d'environnement API_KEY
+# En dev/démo : valeur par défaut utilisée
+API_KEY = os.getenv("API_KEY", "routezone-secret-2024")
+
+def verifier_api_key(x_api_key: str):
+    """Vérifie que la clé API fournie est valide. Lève 403 sinon."""
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=403, detail="Clé API invalide ou manquante")
+
 
 # ── Initialisation de l'application ──────────────────────────────
 app = FastAPI(
@@ -24,6 +41,8 @@ app = FastAPI(
     description="""
 API REST qui expose les données d'accidents routiers BAAC 2022-2024.
 Construite avec FastAPI dans le cadre du projet RouteZone (certification RNCP37827).
+
+**Authentification :** toutes les routes (sauf /) nécessitent le header `X-API-Key`.
 
 **Sources de données :**
 - BAAC (Bulletin d'Analyse des Accidents Corporels) 2022-2024
@@ -33,8 +52,7 @@ Construite avec FastAPI dans le cadre du projet RouteZone (certification RNCP378
     version="1.0.0"
 )
 
-# ── CORS — permet à n'importe quelle app d'appeler cette API ─────
-# En production on restreindrait aux domaines autorisés
+# ── CORS ──────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -43,32 +61,25 @@ app.add_middleware(
 )
 
 # ── Chemin vers la BDD SQLite ─────────────────────────────────────
-# __file__ = chemin du main.py
-# on remonte 2 niveaux pour arriver à la racine du projet
 DB_PATH = Path(__file__).parent.parent / "bdd" / "routezone.db"
 
 
 def get_connection():
-    """
-    Ouvre une connexion à la BDD SQLite.
-    row_factory = sqlite3.Row permet de récupérer les résultats
-    sous forme de dictionnaires plutôt que de tuples.
-    """
+    """Ouvre une connexion à la BDD SQLite."""
     conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row  # résultats sous forme de dict
+    conn.row_factory = sqlite3.Row
     return conn
 
 
-# ── Route racine ──────────────────────────────────────────────────
+# ── Route racine — publique, pas d'auth ──────────────────────────
 @app.get("/")
 def accueil():
-    """
-    Route d'accueil — vérifie que l'API est bien en ligne.
-    """
+    """Route d'accueil — vérifie que l'API est bien en ligne."""
     return {
         "message": "RouteZone API — Données accidents BAAC 2022-2024",
         "version": "1.0.0",
         "documentation": "/docs",
+        "authentification": "Header X-API-Key requis sur tous les endpoints",
         "endpoints": [
             "/accidents",
             "/accidents/stats",
@@ -86,7 +97,8 @@ def liste_accidents(
     departement: Optional[str] = Query(None, description="Numéro de département (ex: 69)"),
     annee: Optional[int] = Query(None, description="Année (2022, 2023 ou 2024)"),
     gravite: Optional[int] = Query(None, description="Gravité : 1=Indemne, 2=Tué, 3=Hospitalisé, 4=Blessé léger"),
-    limite: int = Query(100, description="Nombre de résultats maximum (défaut: 100, max: 1000)")
+    limite: int = Query(100, description="Nombre de résultats maximum (défaut: 100, max: 1000)"),
+    x_api_key: str = Header(None)
 ):
     """
     Retourne la liste des accidents avec filtres optionnels.
@@ -96,11 +108,11 @@ def liste_accidents(
     - **gravite** : filtre par niveau de gravité
     - **limite** : nombre max de résultats (max 1000)
     """
-    # Sécurité : on limite à 1000 résultats max pour éviter les surcharges
+    verifier_api_key(x_api_key)
+
     if limite > 1000:
         limite = 1000
 
-    # Construction de la requête SQL dynamiquement selon les filtres
     query = "SELECT * FROM accidents WHERE 1=1"
     params = []
 
@@ -113,8 +125,6 @@ def liste_accidents(
         params.append(annee)
 
     if gravite:
-        # grav est dans la table usagers, pas accidents
-        # on fait une sous-requête pour filtrer
         query = f"""
             SELECT DISTINCT a.*
             FROM accidents a
@@ -150,7 +160,7 @@ def liste_accidents(
 
 # ── Route 2 : statistiques globales ──────────────────────────────
 @app.get("/accidents/stats")
-def statistiques_globales():
+def statistiques_globales(x_api_key: str = Header(None)):
     """
     Retourne des statistiques globales sur le dataset.
 
@@ -159,19 +169,18 @@ def statistiques_globales():
     - Répartition par gravité
     - Départements les plus accidentogènes
     """
+    verifier_api_key(x_api_key)
+
     try:
         conn = get_connection()
 
-        # Total accidents
         total = pd.read_sql_query("SELECT COUNT(*) as total FROM accidents", conn)
 
-        # Par année
         par_annee = pd.read_sql_query(
             "SELECT an, COUNT(*) as nb_accidents FROM accidents GROUP BY an ORDER BY an",
             conn
         )
 
-        # Par gravité (depuis la table usagers)
         par_gravite = pd.read_sql_query(
             """SELECT grav,
                       COUNT(*) as nb_usagers,
@@ -188,7 +197,6 @@ def statistiques_globales():
             conn
         )
 
-        # Top 10 départements
         top_dep = pd.read_sql_query(
             """SELECT dep, COUNT(*) as nb_accidents
                FROM accidents
@@ -215,13 +223,16 @@ def statistiques_globales():
 @app.get("/accidents/departement/{dep}")
 def accidents_par_departement(
     dep: str,
-    annee: Optional[int] = Query(None, description="Filtrer par année")
+    annee: Optional[int] = Query(None, description="Filtrer par année"),
+    x_api_key: str = Header(None)
 ):
     """
     Retourne les statistiques d'accidents pour un département précis.
 
     - **dep** : numéro de département (ex: 69, 13, 75)
     """
+    verifier_api_key(x_api_key)
+
     query = """
         SELECT
             a.an,
@@ -245,7 +256,6 @@ def accidents_par_departement(
     try:
         conn = get_connection()
 
-        # Vérifier que le département existe
         check = pd.read_sql_query(
             "SELECT COUNT(*) as nb FROM accidents WHERE dep = ?", conn, params=[dep]
         )
@@ -277,11 +287,12 @@ def accidents_par_departement(
 @app.get("/accidents/gravite")
 def repartition_gravite(
     annee: Optional[int] = Query(None, description="Filtrer par année"),
-    departement: Optional[str] = Query(None, description="Filtrer par département")
+    departement: Optional[str] = Query(None, description="Filtrer par département"),
+    x_api_key: str = Header(None)
 ):
-    """
-    Retourne la répartition des accidents par niveau de gravité.
-    """
+    """Retourne la répartition des accidents par niveau de gravité."""
+    verifier_api_key(x_api_key)
+
     query = """
         SELECT
             u.grav,
@@ -328,14 +339,13 @@ def repartition_gravite(
 
 # ── Route 5 : stats météo API ─────────────────────────────────────
 @app.get("/meteo/stats")
-def stats_meteo():
-    """
-    Retourne des statistiques sur les données météo collectées via l'API Open-Meteo.
-    """
+def stats_meteo(x_api_key: str = Header(None)):
+    """Retourne des statistiques sur les données météo collectées via l'API Open-Meteo."""
+    verifier_api_key(x_api_key)
+
     try:
         conn = get_connection()
 
-        # Vérifier si la table meteo existe
         tables = pd.read_sql_query(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='meteo'", conn
         )
@@ -368,11 +378,12 @@ def stats_meteo():
 # ── Route 6 : baromètre ONISR ────────────────────────────────────
 @app.get("/onisr/barometre")
 def barometre_onisr(
-    annee: Optional[int] = Query(None, description="Filtrer par année (2022, 2023, 2024)")
+    annee: Optional[int] = Query(None, description="Filtrer par année (2022, 2023, 2024)"),
+    x_api_key: str = Header(None)
 ):
-    """
-    Retourne les données du baromètre mensuel ONISR scrapées depuis le site officiel.
-    """
+    """Retourne les données du baromètre mensuel ONISR scrapées depuis le site officiel."""
+    verifier_api_key(x_api_key)
+
     try:
         conn = get_connection()
 
