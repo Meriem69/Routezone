@@ -1,8 +1,17 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Header
 from pathlib import Path
 import joblib
 import numpy as np
 from pydantic import BaseModel
+import os
+
+# ── Authentification API Key ──────────────────────────────────────
+API_KEY = os.getenv("API_KEY", "routezone-secret-2024")
+
+def verifier_api_key(x_api_key: str):
+    """Vérifie que la clé API fournie est valide. Lève 403 sinon."""
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=403, detail="Clé API invalide ou manquante")
 
 # Chemins vers les modèles
 MODELS_DIR = Path(__file__).parent.parent / "models"
@@ -49,7 +58,11 @@ def accueil():
     return {"message": "RouteZone API IA", "status": "ok"}
 
 @app.post("/predict")
-def predict(data: AccidentInput):
+def predict(data: AccidentInput, 
+            x_api_key: str = Header(None)
+):
+    verifier_api_key(x_api_key)
+
     valeurs = [
         data.lum, data.agg, data.int_, data.atm, data.col, data.catr,
         data.circ, data.vosp, data.prof, data.plan, data.surf, data.infra,
