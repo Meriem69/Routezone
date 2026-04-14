@@ -1,7 +1,12 @@
-```
-# Données brutes — trop lourdes pour Git
-bloc1_donnees/data/raw/
-bloc1_donnees/data/processed/
+# Environnement virtuel
+venv/
+
+# Données brutes
+data/raw/
+data/processed/
+
+# Modèles ML
+models/*.pkl
 
 # Base de données SQLite
 *.db
@@ -9,7 +14,12 @@ bloc1_donnees/data/processed/
 # Python
 __pycache__/
 *.pyc
+
+# Jupyter
 .ipynb_checkpoints/
 
 # VS Code
 .vscode/
+
+# Rapports perso
+rapports perso routezone/
