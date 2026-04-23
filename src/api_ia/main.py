@@ -13,19 +13,30 @@ def verifier_api_key(x_api_key: str):
     if x_api_key != API_KEY:
         raise HTTPException(status_code=403, detail="Clé API invalide ou manquante")
 
-# Chemins vers les modèles
+# ── Chargement des fichiers au démarrage ──────────────────────────
 MODELS_DIR = Path(__file__).parent.parent / "models"
 
-# Chargement des 3 fichiers au démarrage de l'API
 model         = joblib.load(MODELS_DIR / "best_model.pkl")
 features      = joblib.load(MODELS_DIR / "features.pkl")
 class_mapping = joblib.load(MODELS_DIR / "class_mapping.pkl")
 
-print(f" ok Modèle chargé")
-print(f" ok{len(features)} features : {features}")
+print(f"Modele charge : {len(features)} features")
 
-app = FastAPI()
+# ── Application FastAPI ───────────────────────────────────────────
+app = FastAPI(
+    title="RouteZone API IA",
+    description="""
+API REST exposant le modele LightGBM de prediction de gravite d'accidents routiers.
 
+**Authentification :** header X-API-Key requis sur /predict.
+
+**Seuil de decision :** 0.5 (seuil standard — meilleur equilibre Recall/Precision).
+Differents seuils ont ete testes (0.35 a 0.5) — voir notebook_04 section 12.3.
+    """,
+    version="1.0.0"
+)
+
+# ── Modele de donnees d'entree ────────────────────────────────────
 class AccidentInput(BaseModel):
     lum: int
     agg: int
@@ -53,14 +64,26 @@ class AccidentInput(BaseModel):
     precipitation: float
     windspeed: float
 
+# ── Route d'accueil — publique ────────────────────────────────────
 @app.get("/")
 def accueil():
-    return {"message": "RouteZone API IA", "status": "ok"}
+    return {
+        "message": "RouteZone API IA",
+        "status": "ok",
+        "documentation": "/docs"
+    }
 
+# ── Route de prediction — protegee ───────────────────────────────
 @app.post("/predict")
-def predict(data: AccidentInput, 
-            x_api_key: str = Header(None)
-):
+def predict(data: AccidentInput, x_api_key: str = Header(None)):
+    """
+    Predit la gravite d'un accident routier.
+
+    Retourne :
+    - **prediction** : 0 (Pas grave) ou 1 (Grave)
+    - **label** : 'Pas grave' ou 'Grave'
+    - **probability** : probabilite d'etre GRAVE en pourcentage
+    """
     verifier_api_key(x_api_key)
 
     valeurs = [
@@ -72,15 +95,16 @@ def predict(data: AccidentInput,
     ]
 
     X = np.array([valeurs])
-    pred_raw = model.predict(X)
-    pred_int = int(pred_raw[0])
+
+    # Seuil 0.5 par defaut — meilleur equilibre Recall/Precision
+    # Recall GRAVE : 0.796 | Precision GRAVE : 0.414 | F1 macro : 0.695
+    # Differents seuils testes dans notebook_04 section 12.3
+    pred_int    = int(model.predict(X)[0])
     probability = float(model.predict_proba(X)[0][1])
 
-    # class_mapping peut être un dict, une liste ou un array numpy
     if isinstance(class_mapping, dict):
         label = str(class_mapping[pred_int])
     else:
-        # liste ou array numpy → indexation directe
         val = class_mapping[pred_int]
         label = str(val.item() if hasattr(val, 'item') else val)
 
