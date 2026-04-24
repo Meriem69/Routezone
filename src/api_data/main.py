@@ -2,7 +2,7 @@
 RouteZone — API données
 =======================
 FastAPI qui expose les données d'accidents BAAC via des endpoints HTTP.
-Compétence C5 — Bloc 1 — Certification RNCP37827 Dev IA Simplon
+Certification RNCP37827 Dev IA Simplon
 
 Lancer l'API :
     uvicorn main:app --reload
@@ -22,17 +22,45 @@ import pandas as pd
 from pathlib import Path
 from typing import Optional
 import os
+import math
 
 
 # ── Authentification API Key ──────────────────────────────────────
-# En production : définir la variable d'environnement API_KEY
-# En dev/démo : valeur par défaut utilisée
 API_KEY = os.getenv("API_KEY", "routezone-secret-2024")
 
 def verifier_api_key(x_api_key: str):
     """Vérifie que la clé API fournie est valide. Lève 403 sinon."""
     if x_api_key != API_KEY:
         raise HTTPException(status_code=403, detail="Clé API invalide ou manquante")
+
+
+def nettoyer_valeur(val):
+    """
+    Convertit une valeur en type JSON-compatible.
+    NaN, Infinity, -Infinity → None (null JSON).
+    Sans ce traitement, json.dumps plante sur les floats hors range.
+    """
+    if val is None:
+        return None
+    if isinstance(val, float):
+        if math.isnan(val) or math.isinf(val):
+            return None
+        return val
+    if isinstance(val, (int, str, bool)):
+        return val
+    return val
+
+
+def nettoyer_df(df: pd.DataFrame) -> list:
+    """
+    Convertit un DataFrame en liste de dicts JSON-compatible.
+    Applique nettoyer_valeur sur chaque cellule.
+    """
+    records = df.where(df.notna(), None).to_dict(orient="records")
+    return [
+        {k: nettoyer_valeur(v) for k, v in row.items()}
+        for row in records
+    ]
 
 
 # ── Initialisation de l'application ──────────────────────────────
@@ -61,7 +89,7 @@ app.add_middleware(
 )
 
 # ── Chemin vers la BDD SQLite ─────────────────────────────────────
-DB_PATH = Path(__file__).parent.parent / "bdd" / "routezone.db"
+DB_PATH = Path(__file__).parent.parent.parent / "bdd" / "routezone.db"
 
 
 def get_connection():
@@ -125,7 +153,7 @@ def liste_accidents(
         params.append(annee)
 
     if gravite:
-        query = f"""
+        query = """
             SELECT DISTINCT a.*
             FROM accidents a
             JOIN usagers u ON a.num_acc = u.num_acc
@@ -152,7 +180,7 @@ def liste_accidents(
                 "annee": annee,
                 "gravite": gravite
             },
-            "accidents": df.to_dict(orient="records")
+            "accidents": nettoyer_df(df)
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur BDD : {str(e)}")
@@ -210,9 +238,9 @@ def statistiques_globales(x_api_key: str = Header(None)):
 
         return {
             "total_accidents": int(total["total"].iloc[0]),
-            "par_annee": par_annee.to_dict(orient="records"),
-            "par_gravite": par_gravite.to_dict(orient="records"),
-            "top_10_departements": top_dep.to_dict(orient="records")
+            "par_annee": nettoyer_df(par_annee),
+            "par_gravite": nettoyer_df(par_gravite),
+            "top_10_departements": nettoyer_df(top_dep)
         }
 
     except Exception as e:
@@ -274,7 +302,7 @@ def accidents_par_departement(
             "annee_filtre": annee,
             "total_accidents": int(df["nb_accidents"].sum()),
             "total_tues": int(df["nb_tues"].sum()),
-            "stats_par_mois": df.to_dict(orient="records")
+            "stats_par_mois": nettoyer_df(df)
         }
 
     except HTTPException:
@@ -330,7 +358,7 @@ def repartition_gravite(
         return {
             "filtres": {"annee": annee, "departement": departement},
             "total_usagers": int(total),
-            "repartition": df.to_dict(orient="records")
+            "repartition": nettoyer_df(df)
         }
 
     except Exception as e:
@@ -368,7 +396,7 @@ def stats_meteo(x_api_key: str = Header(None)):
 
         return {
             "source": "API Open-Meteo (météo historique)",
-            "stats": stats.to_dict(orient="records")[0]
+            "stats": nettoyer_df(stats)[0]
         }
 
     except Exception as e:
@@ -411,7 +439,7 @@ def barometre_onisr(
             "annee_filtre": annee,
             "nb_mois": len(df),
             "total_tues": int(df["tues_metropole"].sum()) if df["tues_metropole"].notna().any() else None,
-            "barometre": df.to_dict(orient="records")
+            "barometre": nettoyer_df(df)
         }
 
     except Exception as e:
