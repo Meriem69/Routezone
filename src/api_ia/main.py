@@ -14,7 +14,7 @@ def verifier_api_key(x_api_key: str):
         raise HTTPException(status_code=403, detail="Clé API invalide ou manquante")
 
 # ── Chargement des fichiers au démarrage ──────────────────────────
-MODELS_DIR = Path(__file__).parent.parent / "models"
+MODELS_DIR = Path(__file__).parent.parent.parent / "models"
 
 model         = joblib.load(MODELS_DIR / "best_model.pkl")
 features      = joblib.load(MODELS_DIR / "features.pkl")
