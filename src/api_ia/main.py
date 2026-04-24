@@ -14,13 +14,19 @@ def verifier_api_key(x_api_key: str):
         raise HTTPException(status_code=403, detail="Clé API invalide ou manquante")
 
 # ── Chargement des fichiers au démarrage ──────────────────────────
-MODELS_DIR = Path(__file__).parent.parent.parent / "models"
+# MODELS_DIR peut être défini via variable d'environnement (Docker)
+# ou calculé depuis le chemin du fichier (local)
+MODELS_DIR = Path(os.getenv(
+    "MODELS_DIR",
+    str(Path(__file__).parent.parent.parent / "models")
+))
 
 model         = joblib.load(MODELS_DIR / "best_model.pkl")
 features      = joblib.load(MODELS_DIR / "features.pkl")
 class_mapping = joblib.load(MODELS_DIR / "class_mapping.pkl")
 
 print(f"Modele charge : {len(features)} features")
+print(f"MODELS_DIR    : {MODELS_DIR}")
 
 # ── Application FastAPI ───────────────────────────────────────────
 app = FastAPI(
@@ -98,7 +104,6 @@ def predict(data: AccidentInput, x_api_key: str = Header(None)):
 
     # Seuil 0.5 par defaut — meilleur equilibre Recall/Precision
     # Recall GRAVE : 0.796 | Precision GRAVE : 0.414 | F1 macro : 0.695
-    # Differents seuils testes dans notebook_04 section 12.3
     pred_int    = int(model.predict(X)[0])
     probability = float(model.predict_proba(X)[0][1])
 
