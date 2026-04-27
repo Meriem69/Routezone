@@ -3,13 +3,11 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Installation des dépendances système nécessaires pour LightGBM
-# libgomp1 = OpenMP, requis par LightGBM pour le calcul parallèle
 RUN apt-get update && apt-get install -y \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements_api_ia.txt .
+COPY docker/requirements_api_ia.txt .
 RUN pip install --no-cache-dir -r requirements_api_ia.txt
 
 COPY src/api_ia/main.py .

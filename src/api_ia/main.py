@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Header
 from pathlib import Path
 import joblib
 import numpy as np
+import pandas as pd
 from pydantic import BaseModel
 import os
 
@@ -100,7 +101,9 @@ def predict(data: AccidentInput, x_api_key: str = Header(None)):
         data.temperature, data.precipitation, data.windspeed
     ]
 
-    X = np.array([valeurs])
+    # DataFrame avec les noms de colonnes — élimine le warning sklearn
+    # "X does not have valid feature names"
+    X = pd.DataFrame([valeurs], columns=features)
 
     # Seuil 0.5 par defaut — meilleur equilibre Recall/Precision
     # Recall GRAVE : 0.796 | Precision GRAVE : 0.414 | F1 macro : 0.695

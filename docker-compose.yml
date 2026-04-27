@@ -10,7 +10,7 @@ services:
   api_data:
     build:
       context: .
-      dockerfile: Dockerfile.api_data
+      dockerfile: docker/Dockerfile.api_data
     container_name: routezone_api_data
     ports:
       - "8000:8000"
@@ -24,7 +24,7 @@ services:
   api_ia:
     build:
       context: .
-      dockerfile: Dockerfile.api_ia
+      dockerfile: docker/Dockerfile.api_ia
     container_name: routezone_api_ia
     ports:
       - "8001:8001"

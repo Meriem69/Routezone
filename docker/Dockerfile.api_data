@@ -1,20 +1,13 @@
 # ── Dockerfile — API données RouteZone ───────────────────────────
-# Image de base Python légère
 FROM python:3.11-slim
 
-# Répertoire de travail dans le conteneur
 WORKDIR /app
 
-# Copie et installation des dépendances d'abord
-# (optimisation cache Docker : si requirements ne change pas, pas de réinstall)
-COPY requirements_api_data.txt .
+COPY docker/requirements_api_data.txt .
 RUN pip install --no-cache-dir -r requirements_api_data.txt
 
-# Copie du code de l'API
 COPY src/api_data/main.py .
 
-# Port exposé
 EXPOSE 8000
 
-# Commande de démarrage
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -6,3 +6,4 @@ numpy==1.26.0
 scikit-learn==1.5.1
 pydantic==2.12.3
 python-multipart==0.0.20
+pandas==2.2.0
