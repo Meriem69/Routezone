@@ -23,12 +23,10 @@ def svg(path_d, extra="", w=14, h=14, color="#94a3b8", viewBox="0 0 24 24"):
     return f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="{viewBox}" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{path_d}{extra}</svg>'
 
 ICONS = {
-    # sections
     "traffic":  '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><circle cx="12" cy="7" r="2" fill="#ef4444" stroke="none"/><circle cx="12" cy="12" r="2" fill="#f59e0b" stroke="none"/><circle cx="12" cy="17" r="2" fill="#22c55e" stroke="none"/></svg>',
     "warning":  svg('<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>', color="#f97316", w=15, h=15),
     "person":   svg('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>', color="#f97316", w=15, h=15),
     "calendar": svg('<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>', color="#f97316", w=15, h=15),
-    # champs
     "sun":      svg('<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>'),
     "map-pin":  svg('<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>'),
     "cloud":    svg('<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>'),
@@ -63,7 +61,6 @@ header[data-testid="stHeader"] {{ background: transparent !important; }}
 .stDeployButton {{ display: none; }}
 #MainMenu {{ visibility: hidden; }}
 
-/* ── HERO ── */
 .hero-banner {{
     width: 100vw;
     min-height: 270px;
@@ -111,8 +108,6 @@ header[data-testid="stHeader"] {{ background: transparent !important; }}
     font-weight: 300;
     letter-spacing: 0.4px;
 }}
-
-/* ── SECTION LABELS ── */
 .section-label {{
     color: #f97316;
     font-size: 0.67rem;
@@ -130,8 +125,6 @@ header[data-testid="stHeader"] {{ background: transparent !important; }}
     height: 1px;
     background: linear-gradient(90deg, #334155 0%, transparent 100%);
 }}
-
-/* ── FIELD LABELS custom ── */
 .field-label {{
     display: flex;
     align-items: center;
@@ -145,11 +138,7 @@ header[data-testid="stHeader"] {{ background: transparent !important; }}
     margin-top: 0.6rem;
 }}
 .field-label span {{ line-height: 1; }}
-
-/* Masquer les vrais labels Streamlit quand on utilise field-label */
 .hide-label label {{ display: none !important; }}
-
-/* ── LABELS natifs (fallback) ── */
 label, .stSelectbox label, .stNumberInput label {{
     color: #94a3b8 !important;
     font-size: 0.74rem !important;
@@ -157,20 +146,13 @@ label, .stSelectbox label, .stNumberInput label {{
     text-transform: uppercase !important;
     letter-spacing: 1.2px !important;
 }}
-
-/* ── SELECTBOX ── */
 .stSelectbox > div > div {{
     background-color: #111827 !important;
     border: 1px solid #1e293b !important;
     border-radius: 8px !important;
     color: #e2e8f0 !important;
-    transition: border-color 0.2s, box-shadow 0.2s;
 }}
 .stSelectbox > div > div:hover {{ border-color: #f97316 !important; }}
-.stSelectbox > div > div:focus-within {{
-    border-color: #f97316 !important;
-    box-shadow: 0 0 0 2px rgba(249,115,22,0.18) !important;
-}}
 .stSelectbox svg {{ fill: #f97316 !important; }}
 div[data-baseweb="popover"] {{
     background: #111827 !important;
@@ -186,8 +168,6 @@ li[role="option"]:hover, li[aria-selected="true"] {{
     background: rgba(249,115,22,0.12) !important;
     color: #f97316 !important;
 }}
-
-/* ── NUMBER INPUT ── */
 .stNumberInput > div > div > input {{
     background-color: #111827 !important;
     border: 1px solid #1e293b !important;
@@ -201,22 +181,12 @@ li[role="option"]:hover, li[aria-selected="true"] {{
     background-color: #1e293b !important;
     border: 1px solid #1e293b !important;
     color: #f97316 !important;
-    transition: all 0.15s;
 }}
-.stNumberInput button:hover {{
-    background-color: #f97316 !important;
-    color: #fff !important;
-    border-color: #f97316 !important;
-}}
-
-/* ── DIVIDER ── */
 hr {{
     border: none !important;
     border-top: 1px solid #1e293b !important;
     margin: 1.5rem 0 !important;
 }}
-
-/* ── BOUTON ── */
 div[data-testid="stButton"] > button {{
     background: linear-gradient(135deg, #f97316 0%, #dc2626 100%) !important;
     color: white !important;
@@ -227,23 +197,14 @@ div[data-testid="stButton"] > button {{
     letter-spacing: 2.5px !important;
     padding: 0.75rem 2rem !important;
     width: 100% !important;
-    transition: all 0.2s ease !important;
     box-shadow: 0 4px 24px rgba(249,115,22,0.38) !important;
 }}
-div[data-testid="stButton"] > button:hover {{
-    transform: translateY(-2px) !important;
-    box-shadow: 0 10px 32px rgba(249,115,22,0.58) !important;
-}}
-
-/* ── ALERTES ── */
 div[data-testid="stAlert"] {{
     border-radius: 12px !important;
     font-weight: 500 !important;
     font-size: 1rem !important;
     margin-top: 1rem !important;
 }}
-
-/* ── FOOTER ── */
 .footer {{
     text-align: center;
     color: #e2e8f0;
@@ -342,7 +303,6 @@ with col2:
             99: "Autre"}[x])
 
     st.markdown(field_label("shield", "Équipement de sécurité"), unsafe_allow_html=True)
-    st.markdown('<div style="font-size:0.72rem;color:#475569;margin-bottom:4px;">Sélectionnez tout ce qui s\'applique</div>', unsafe_allow_html=True)
     secu_choices = st.multiselect("Équipement de sécurité",
         options=[0,1,2,3,4,5,6,7,9],
         default=[0],
@@ -352,8 +312,6 @@ with col2:
             3:"Siège enfant", 4:"Gilet réfléchissant",
             5:"Airbag moto", 6:"Gants moto",
             7:"Gants + Airbag moto", 9:"Autre"}[x])
-    # On garde le premier équipement coché pour le modèle (secu1)
-    # Si "Aucun" est parmi les choix avec d'autres, on retire Aucun
     if len(secu_choices) > 1 and 0 in secu_choices:
         secu_choices = [x for x in secu_choices if x != 0]
     secu1 = secu_choices[0] if secu_choices else 0
@@ -386,8 +344,7 @@ c_heure, c_mois = st.columns(2, gap="large")
 with c_heure:
     st.markdown(field_label("clock", "Heure de l'accident"), unsafe_allow_html=True)
     heure = st.slider("Heure", min_value=0, max_value=23, value=12,
-        label_visibility="collapsed",
-        format="%dh00")
+        label_visibility="collapsed", format="%dh00")
     st.markdown(f'<div style="text-align:center;color:#f97316;font-size:1.1rem;font-weight:600;margin-top:-8px;">{heure:02d}h00</div>', unsafe_allow_html=True)
 with c_mois:
     st.markdown(field_label("month", "Mois de l'accident"), unsafe_allow_html=True)
@@ -416,18 +373,21 @@ if predict:
         "windspeed": windspeed
     }
     try:
-        response = requests.post("http://127.0.0.1:8001/predict", json=payload)
+        response = requests.post(
+            "http://127.0.0.1:8001/predict",
+            json=payload,
+            headers={"X-API-Key": "routezone-secret-2024"}
+        )
         result = response.json()
         if result["label"] == "Grave":
-            st.error(f"Accident GRAVE prédit — Probabilité : **{result['probability']}%**")
+            st.error(f"Accident GRAVE predit — Probabilite : **{result['probability']}%**")
         else:
-            st.success(f"Accident PAS GRAVE prédit — Probabilité : **{result['probability']}%**")
-    except Exception:
-        st.warning("Impossible de contacter l'API. Vérifiez que la FastAPI tourne sur le port 8001.")
+            st.success(f"Accident PAS GRAVE predit — Probabilite : **{result['probability']}%**")
+    except Exception as e:
+        st.warning(f"Impossible de contacter l'API. Verifiez que la FastAPI tourne sur le port 8001. Erreur : {e}")
 
 st.divider()
 
-# Footer en HTML direct — pas st.caption qui se fait écraser
 st.markdown(
     '<div class="footer">RouteZone &nbsp;—&nbsp; Abdelouahed Meriem &nbsp;—&nbsp; IA Simplon × Microsoft &nbsp;—&nbsp; RNCP37827</div>',
     unsafe_allow_html=True
