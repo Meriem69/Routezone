@@ -1,36 +1,93 @@
 # ── docker-compose.yml — RouteZone ───────────────────────────────
-# Lance les 2 APIs en une seule commande : docker-compose up
+# Lance PostgreSQL + OSRM + API : docker-compose up
+# Variables d'environnement chargees depuis .env
 #
-# Les fichiers lourds (BDD, modèles) sont montés en volumes depuis
-# l'hôte — ils ne sont pas copiés dans les images Docker.
+# Premiere utilisation OSRM :
+#   docker-compose --profile prepare run --rm osrm-prepare
 
 services:
 
-  # ── API données ─────────────────────────────────────────────────
-  api_data:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.api_data
-    container_name: routezone_api_data
-    ports:
-      - "8000:8000"
+  # ── PostgreSQL ─────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: routezone_db
+    env_file:
+      - .env
     volumes:
-      - ./bdd:/app/bdd:ro
-    environment:
-      - API_KEY=routezone-secret-2024
+      - pgdata:/var/lib/postgresql/data
+      - ./bdd/create_db.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U routezone"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
-  # ── API IA ──────────────────────────────────────────────────────
-  api_ia:
+  # ── OSRM — routage temps reel ──────────────────────────────────
+  osrm-prepare:
+    image: ghcr.io/project-osrm/osrm-backend
+    container_name: routezone_osrm_prepare
+    volumes:
+      - osrm_data:/data
+    entrypoint: /bin/sh
+    command: >
+      -c "
+      if [ ! -f /data/france-latest.osm.pbf ]; then
+        echo 'Telechargement France (~4 Go)...' &&
+        apk add --no-cache wget &&
+        wget -q --show-progress -O /data/france-latest.osm.pbf https://download.geofabrik.de/europe/france-latest.osm.pbf;
+      fi &&
+      if [ ! -f /data/france-latest.osrm ]; then
+        echo 'Extraction...' &&
+        osrm-extract -p /opt/car.lua /data/france-latest.osm.pbf &&
+        echo 'Partition...' &&
+        osrm-partition /data/france-latest.osrm &&
+        echo 'Customisation...' &&
+        osrm-customize /data/france-latest.osrm &&
+        echo 'OSRM pret !';
+      else
+        echo 'Donnees OSRM deja preparees.';
+      fi
+      "
+    profiles:
+      - prepare
+
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend
+    container_name: routezone_osrm
+    volumes:
+      - osrm_data:/data
+    ports:
+      - "5000:5000"
+    command: osrm-routed --algorithm mld /data/france-latest.osrm
+    restart: unless-stopped
+
+  # ── API unifiee (donnees + IA + auth) ──────────────────────────
+  api:
     build:
       context: .
-      dockerfile: docker/Dockerfile.api_ia
-    container_name: routezone_api_ia
+      dockerfile: docker/Dockerfile.api
+    container_name: routezone_api
     ports:
       - "8001:8001"
     volumes:
       - ./models:/app/models:ro
+    env_file:
+      - .env
     environment:
-      - API_KEY=routezone-secret-2024
       - MODELS_DIR=/app/models
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
+
+volumes:
+  pgdata:
+  osrm_data:

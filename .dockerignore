@@ -1,0 +1,16 @@
+data/
+notebooks/
+venv/
+models/
+bdd/
+.git/
+docs/
+tests/
+rapports perso routezone/
+__pycache__/
+*.pyc
+*.db
+*.pkl
+.env
+.gitignore
+README.md

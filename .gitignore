@@ -1,25 +1,61 @@
-# Environnement virtuel
+# === Environnements Python ===
 venv/
+.venv/
+env/
 
-# Données brutes
-data/raw/
-data/processed/
-
-# Modèles ML
-models/*.pkl
-
-# Base de données SQLite
-*.db
-
-# Python
+# === Cache Python ===
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.pytest_cache/
 
-# Jupyter
+# === Jupyter ===
 .ipynb_checkpoints/
 
-# VS Code
-.vscode/
+# === Secrets ===
+.env
+.env.local
+*.key
+*.pem
 
-# Rapports perso
+# === Logs ===
+*.log
+logs/
+osrm_all.err
+osrm_all.log
+
+# === Fichiers OS ===
+.DS_Store
+Thumbs.db
+
+# === IDE ===
+.vscode/
+.idea/
+.claude/
+
+# === Backups ===
+models_BACKUP/
+*_BACKUP/
+
+# === MLflow ===
+mlruns/
+
+# === OSRM volumes ===
+osrm_data/
+
+# === Build ===
+dist/
+build/
+*.egg-info/
+
+# === Données lourdes ===
+data/raw/
+data/processed/*.csv
+*.osm.pbf
+
+# === Base de données SQLite ===
+*.db
+
+# === Rapports perso ===
 rapports perso routezone/

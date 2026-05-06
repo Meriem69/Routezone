@@ -1,13 +1,20 @@
-import sqlite3
 import pandas as pd
 from pathlib import Path
+from sqlalchemy import create_engine, text
+import os
 
 # Chemins
-DB_PATH = Path(__file__).parent / 'routezone.db'
 CSV_PATH = Path(__file__).parent.parent / 'data' / 'processed' / 'dataset_clean.csv'
+SQL_PATH = Path(__file__).parent / 'create_db.sql'
 
-print(f"BDD : {DB_PATH}")
+# Connexion PostgreSQL
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://routezone:routezone_pwd_2024@localhost:5432/routezone"
+)
+
 print(f"CSV : {CSV_PATH}")
+print(f"BDD : {DATABASE_URL.split('@')[1]}")  # masque le mot de passe
 
 # Chargement du CSV
 print("Chargement du dataset...")
@@ -16,11 +23,22 @@ print(f"{len(df):,} lignes chargées | {df.shape[1]} colonnes")
 print(df.columns.tolist())
 
 # Connexion à la BDD
-print("\nConnexion à la BDD...")
-conn = sqlite3.connect(DB_PATH)
-print("Connecté !")
+print("\nConnexion à PostgreSQL...")
+engine = create_engine(DATABASE_URL)
 
-#PREPARATION DES DONNEES PR CHAQUE TABLE :
+with engine.begin() as conn:
+    print("Connecté !")
+
+    # Création du schéma
+    print("\nCréation du schéma...")
+    with open(SQL_PATH, 'r') as f:
+        for statement in f.read().split(';'):
+            statement = statement.strip()
+            if statement:
+                conn.execute(text(statement))
+    print("Schéma créé !")
+
+# PREPARATION DES DONNEES PR CHAQUE TABLE :
 
 # Préparation table accidents
 print("\nPréparation table accidents...")
@@ -63,15 +81,13 @@ print(f"{len(usagers):,} usagers")
 
 # Import dans la BDD
 print("\nImport en cours...")
-accidents.to_sql('accidents', conn, if_exists='replace', index=False)
+accidents.to_sql('accidents', engine, if_exists='append', index=False, method='multi', chunksize=5000)
 print("accidents ok")
-lieux.to_sql('lieux', conn, if_exists='replace', index=False)
+lieux.to_sql('lieux', engine, if_exists='append', index=False, method='multi', chunksize=5000)
 print("lieux ok")
-vehicules.to_sql('vehicules', conn, if_exists='replace', index=False)
+vehicules.to_sql('vehicules', engine, if_exists='append', index=False, method='multi', chunksize=5000)
 print("vehicules ok")
-usagers.to_sql('usagers', conn, if_exists='replace', index=False)
+usagers.to_sql('usagers', engine, if_exists='append', index=False, method='multi', chunksize=5000)
 print("usagers ok")
 
-# Fermeture connexion
-conn.close()
-print("\nImport terminé ! BDD fermée.")
+print("\nImport terminé !")

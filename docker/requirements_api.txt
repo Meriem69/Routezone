@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+pandas
+python-multipart
+sqlalchemy
+psycopg2-binary
+lightgbm
+joblib
+numpy
+scikit-learn
+pydantic
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt==4.0.1
