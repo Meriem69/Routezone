@@ -11,7 +11,7 @@ from math import radians, sin, cos, sqrt, atan2
 
 import joblib
 import pandas as pd
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import text
 import os
 
@@ -68,21 +68,21 @@ class AccidentInput(BaseModel):
     surf: int
     infra: int
     situ: int
-    vma: int
+    vma: int = Field(..., ge=0, le=200)
     catu: int
     sexe: int
     trajet: int
     secu1: int
     catv: int
-    age: int
-    heure: int
-    mois: int
-    temperature: float
-    precipitation: float
-    windspeed: float
+    age: int = Field(..., ge=0, le=120)
+    heure: int = Field(..., ge=0, le=23)
+    mois: int = Field(..., ge=1, le=12)
+    temperature: float = Field(..., ge=-30, le=50)
+    precipitation: float = Field(..., ge=0)
+    windspeed: float = Field(..., ge=0, le=300)
     jour: int = 15
-    lat: float = None
-    lon: float = None
+    lat: float = Field(None, ge=-90, le=90)
+    lon: float = Field(None, ge=-180, le=180)
     # V3 OSRM : temps reels calcules cote Streamlit via OSRM Docker.
     # Optionnels : si fournis, on les utilise tels quels (route reelle).
     # Sinon fallback Haversine x 1.3 (compatibilite).
@@ -189,9 +189,7 @@ def predict(
         "windspeed": data.windspeed,
     }
 
-    if "int_" in features: base["int_"] = data.int_
-    elif "int_feat" in features: base["int_feat"] = data.int_
-    elif "int" in features: base["int"] = data.int_
+    base["int_feat"] = data.int_
 
     if MODEL_VERSION in ("v2", "v3_osrm"):
         base.update(compute_derived_features(data))

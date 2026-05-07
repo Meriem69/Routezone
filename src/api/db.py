@@ -8,7 +8,7 @@ from sqlalchemy.pool import QueuePool
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://routezone:routezone_pwd_2024@localhost:5432/routezone"
+    "postgresql://routezone:routezone_pwd_2024@127.0.0.1:5432/routezone"
 )
 
 engine = create_engine(

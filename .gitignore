@@ -59,3 +59,7 @@ data/processed/*.csv
 
 # === Rapports perso ===
 rapports perso routezone/
+
+# Sauvegardes temporaires
+installed_OLD.txt
+requirements_OLD.txt

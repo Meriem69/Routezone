@@ -4,6 +4,7 @@ Competence C5 : API REST securisee
 """
 
 from fastapi import APIRouter, Query, HTTPException, Depends
+import math
 import pandas as pd
 from typing import Optional
 from sqlalchemy import text
@@ -15,7 +16,19 @@ router = APIRouter(tags=["Donnees BAAC"])
 
 
 def nettoyer_df(df: pd.DataFrame) -> list:
-    return df.where(df.notna(), None).to_dict(orient="records")
+    """DataFrame -> list[dict], NaN/Inf -> None pour serialisation JSON.
+
+    df.where(notna, None) ne suffit pas : sur colonnes float, pandas
+    coerce None en NaN. On nettoie cellule par cellule au niveau dict.
+    """
+    def _safe(v):
+        if isinstance(v, float) and not math.isfinite(v):
+            return None
+        return v
+    return [
+        {k: _safe(v) for k, v in r.items()}
+        for r in df.to_dict(orient="records")
+    ]
 
 
 # ── Accidents ────────────────────────────────────────────────────
