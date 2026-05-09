@@ -2,6 +2,9 @@
 
 **Prediction de la gravite des accidents routiers en France metropolitaine**
 
+[![Tests RouteZone](https://github.com/Meriem69/Routezone/actions/workflows/tests.yml/badge.svg)](https://github.com/Meriem69/Routezone/actions/workflows/tests.yml)
+
+
 Projet de certification RNCP37827 -- Developpeur en Intelligence Artificielle -- Simplon x Microsoft
 
 ---
