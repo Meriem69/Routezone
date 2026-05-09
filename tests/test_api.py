@@ -6,6 +6,7 @@ Utilise FastAPI TestClient.
 """
 
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src" / "api"))
@@ -136,6 +137,76 @@ def test_predict_type_invalide():
     invalide = ACCIDENT_VALIDE.copy()
     invalide["age"] = "trente-cinq"
     r = client.post("/predict", json=invalide, headers=HEADERS)
+    assert r.status_code == 422
+
+
+# ── Smoke tests modele ML ────────────────────────────────────────
+
+def test_model_version_renseigne():
+    r = client.post("/predict", json=ACCIDENT_VALIDE, headers=HEADERS)
+    assert r.status_code == 200
+    mv = r.json().get("model_version")
+    assert isinstance(mv, str) and len(mv) > 0
+
+def test_predict_reproductibilite():
+    r1 = client.post("/predict", json=ACCIDENT_VALIDE, headers=HEADERS)
+    r2 = client.post("/predict", json=ACCIDENT_VALIDE, headers=HEADERS)
+    d1, d2 = r1.json(), r2.json()
+    assert d1["prediction"] == d2["prediction"]
+    assert d1["probability"] == d2["probability"]
+
+def test_predict_proba_dans_intervalle():
+    # NB : l'API renvoie un pourcentage (0-100), pas une proba (0-1).
+    r = client.post("/predict", json=ACCIDENT_VALIDE, headers=HEADERS)
+    proba = r.json()["probability"]
+    assert isinstance(proba, (int, float))
+    assert 0.0 <= proba <= 100.0
+
+def test_predict_label_coherent_avec_proba():
+    # NB : labels reels de l'API : "Grave" / "Pas grave" (pas tout-majuscules).
+    r = client.post("/predict", json=ACCIDENT_VALIDE, headers=HEADERS)
+    data = r.json()
+    expected = "Grave" if data["prediction"] == 1 else "Pas grave"
+    assert data["label"] == expected
+
+def test_predict_temps_reponse_raisonnable():
+    t0 = time.time()
+    r = client.post("/predict", json=ACCIDENT_VALIDE, headers=HEADERS)
+    elapsed = time.time() - t0
+    assert r.status_code == 200
+    assert elapsed < 2.0
+
+
+# ── Bornes Pydantic AccidentInput ────────────────────────────────
+
+def test_predict_age_aberrant():
+    p = ACCIDENT_VALIDE.copy()
+    p["age"] = 999
+    r = client.post("/predict", json=p, headers=HEADERS)
+    assert r.status_code == 422
+
+def test_predict_heure_aberrante():
+    p = ACCIDENT_VALIDE.copy()
+    p["heure"] = 26
+    r = client.post("/predict", json=p, headers=HEADERS)
+    assert r.status_code == 422
+
+def test_predict_mois_aberrant():
+    p = ACCIDENT_VALIDE.copy()
+    p["mois"] = 13
+    r = client.post("/predict", json=p, headers=HEADERS)
+    assert r.status_code == 422
+
+def test_predict_lat_aberrante():
+    p = ACCIDENT_VALIDE.copy()
+    p["lat"] = 200.0
+    r = client.post("/predict", json=p, headers=HEADERS)
+    assert r.status_code == 422
+
+def test_predict_vma_negatif():
+    p = ACCIDENT_VALIDE.copy()
+    p["vma"] = -5
+    r = client.post("/predict", json=p, headers=HEADERS)
     assert r.status_code == 422
 
 
