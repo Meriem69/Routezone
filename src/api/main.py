@@ -14,7 +14,7 @@ Documentation : http://localhost:8001/docs
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
+from logger import logger
 from routes_data import router as data_router
 from routes_ia import router as ia_router
 from routes_auth import router as auth_router
@@ -35,6 +35,8 @@ Certification RNCP37827 Dev IA Simplon x Microsoft.
     """,
     version="2.0.0",
 )
+
+logger.info("API RouteZone demarree")
 
 app.add_middleware(
     CORSMiddleware,

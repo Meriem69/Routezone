@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional
 from datetime import datetime
 from math import radians, sin, cos, sqrt, atan2
+from logger import logger
 
 import joblib
 import pandas as pd
@@ -176,6 +177,8 @@ def predict(
     _: str = Depends(verifier_api_key_ou_jwt),
 ):
     """Predit la gravite d'un accident. Sauvegarde dans l'historique si JWT fourni."""
+    logger.info(f"Prediction demandee : age={data.age}, vma={data.vma}, heure={data.heure}")
+    
     base = {
         "lum": data.lum, "agg": data.agg, "atm": data.atm,
         "col": data.col, "catr": data.catr, "circ": data.circ,
@@ -232,7 +235,7 @@ def predict(
                        "pred": pred_int, "label": label, "prob": prob_pct, "mv": MODEL_VERSION})
         except Exception:
             pass
-
+    logger.info(f"Prediction terminee : resultat={pred_int}, label={label}, proba={prob_pct}%, model={MODEL_VERSION}")        
     return {"prediction": pred_int, "label": label, "probability": prob_pct, "model_version": MODEL_VERSION}
 
 
