@@ -1,0 +1,13 @@
+# Configuration Prometheus pour RouteZone
+# Scrape les metriques de l'API toutes les 15 secondes
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Job : RouteZone API
+  - job_name: 'routezone_api'
+    static_configs:
+      - targets: ['host.docker.internal:8001']
+    metrics_path: '/metrics'

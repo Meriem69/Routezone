@@ -40,6 +40,19 @@
 - Compris : importance d'aligner les tests sur le contrat RÉEL de l'API,
   pas sur une spec théorique
 
+### 10 mai 2026 (dimanche) 
+
+- Création du module `src/api/logger.py` (config logger Python : INFO + console + fichier)
+- Logger intégré dans `main.py` (démarrage API) et `routes_ia.py` (chaque prédiction)
+- Fichier `logs/api.log` se remplit automatiquement à chaque action de l'API
+- 29/29 tests pytest passent toujours
+- Compris :
+  - Logger Python (niveau, handler, format)
+  - Différence niveau (filtre) vs handler (destination)
+  - Pourquoi on ne push PAS les logs sur Git (sensibles + bruyants)
+  - Que mes logs prouvent le déterminisme du modèle
+- Commit f4bad3e push sur master
+
 
 ### A revoir : 
 -  le docker-compose.yml ligne par ligne (et toutes les commandes Docker du quotidien).

@@ -88,6 +88,22 @@ services:
       retries: 3
     restart: unless-stopped
 
+
+# ── Prometheus — collecte des métriques ───────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: routezone_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    restart: unless-stopped
+
 volumes:
   pgdata:
   osrm_data:
+  prometheus_data:

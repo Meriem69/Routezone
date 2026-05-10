@@ -15,6 +15,8 @@ import pandas as pd
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 import os
+from metrics import predictions_total, predictions_par_classe, prediction_duration, errors_total
+import time
 
 from db import engine
 from security import verifier_api_key, verifier_api_key_ou_jwt, get_current_user, get_optional_user
@@ -210,9 +212,12 @@ def predict(
         if col in X.columns:
             X[col] = X[col].astype(int).astype("category")
 
+    start_time = time.time()
     proba = (calibrator or model).predict_proba(X)[0]
     probability = float(proba[1])
     pred_int = int(probability >= 0.5)
+    duration = time.time() - start_time
+    prediction_duration.observe(duration)
 
     if isinstance(class_mapping, dict):
         label = str(class_mapping[pred_int])
@@ -221,6 +226,8 @@ def predict(
         label = str(val.item() if hasattr(val, 'item') else val)
 
     prob_pct = round(probability * 100, 1)
+    predictions_total.labels(model_version=MODEL_VERSION).inc()
+    predictions_par_classe.labels(label=label).inc()
 
     if user is not None:
         try:

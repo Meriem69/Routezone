@@ -18,6 +18,8 @@ from logger import logger
 from routes_data import router as data_router
 from routes_ia import router as ia_router
 from routes_auth import router as auth_router
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from fastapi.responses import Response
 
 # ── Application ──────────────────────────────────────────────────
 app = FastAPI(
@@ -77,3 +79,8 @@ def accueil():
             "auth": ["/auth/register", "/auth/login", "/auth/me"],
         }
     }
+
+@app.get("/metrics", tags=["Monitoring"])
+def metrics():
+    """Endpoint Prometheus pour scraper les metriques."""
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
