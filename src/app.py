@@ -142,18 +142,24 @@ def _infer_vma(agg: int, catr: int) -> int:
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def get_weather_from_openmeteo(lat, lon, jour: int, mois: int):
+def get_weather_from_openmeteo(lat, lon, jour: int, mois: int, annee: int):
     """Recupere temperature / precipitations / vent via Open-Meteo.
 
     - Si lat/lon manquants ou API en erreur -> fallback (15.0, 0.0, 10.0).
     - Date >7 jours dans le passe -> endpoint archive ; sinon forecast.
     - Renvoie (temperature [°C], precipitation [mm], windspeed [km/h]).
+
+    Note sur l'annee : l'utilisateur la saisit dans le formulaire
+    (champ "Annee" dans la section "Donnees temporelles"). La meteo
+    est donc recuperee a la date exacte jour/mois/annee fournie.
+    Si l'annee est dans le passe (>7j) on utilise l'API archive ;
+    sinon l'API forecast (qui couvre aussi les jours recents).
     """
     fallback = (15.0, 0.0, 10.0)
     if lat is None or lon is None:
         return fallback
     try:
-        year = dt.date.today().year
+        year = int(annee)
         try:
             target = dt.date(year, int(mois), int(jour))
         except (ValueError, TypeError):
@@ -347,13 +353,21 @@ ICONS = {
     "age":      svg('<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><line x1="12" y1="14" x2="12" y2="22"/>'),
     "clock":    svg('<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>'),
     "month":    svg('<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="16" y1="14" x2="16" y2="14"/>'),
+    "gauge":    svg('<path d="M12 22a10 10 0 1 0-10-10"/><path d="M12 12l4-4"/>'),
 }
 
 def section_label(key, text):
     return f'<div class="section-label">{ICONS[key]}{text}</div>'
 
-def field_label(key, text):
-    return f'<div class="field-label">{ICONS[key]}<span>{text}</span></div>'
+def field_label(key, text, required=False, optional=False):
+    """Rend un label de champ. required=True ajoute un astérisque rouge accessible
+    (aria-label), optional=True ajoute '(facultatif)' en gris italique."""
+    suffix = ""
+    if required:
+        suffix = '<span class="required-asterisk" aria-label="champ obligatoire"> *</span>'
+    elif optional:
+        suffix = '<span class="optional-tag"> (facultatif)</span>'
+    return f'<div class="field-label">{ICONS[key]}<span>{text}{suffix}</span></div>'
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
 st.markdown(f"""
@@ -574,11 +588,122 @@ section[data-testid="stSidebar"] [data-baseweb="input"] input {{
     border: 1px solid #1e293b !important;
 }}
 section[data-testid="stSidebar"] label {{
-    color: #94a3b8 !important;
+    color: #cbd5e1 !important;
 }}
 section[data-testid="stSidebar"] .stRadio label {{
     color: #e2e8f0 !important;
 }}
+
+/* ── Sidebar : boutons accents orange au hover/focus ── */
+section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:hover,
+section[data-testid="stSidebar"] .stButton > button:hover {{
+    border-color: #f97316 !important;
+    color: #f97316 !important;
+}}
+section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:focus,
+section[data-testid="stSidebar"] .stButton > button:focus {{
+    outline: 2px solid #f97316 !important;
+    outline-offset: 2px !important;
+}}
+
+/* ── Sidebar : carte "Connecté" avec accent orange ── */
+.connected-card {{
+    background: rgba(249,115,22,0.12);
+    border: 1px solid #f97316;
+    border-radius: 8px;
+    padding: 0.8rem 1rem;
+    margin: 0.5rem 0 1rem;
+    color: #fff;
+}}
+.connected-card-label {{
+    font-size: 0.7rem;
+    color: #f97316;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    font-weight: 700;
+    margin-bottom: 4px;
+}}
+.connected-card-email {{
+    color: #fdba74;
+    font-size: 0.85rem;
+    word-break: break-all;
+}}
+
+/* ── Marqueurs obligatoire / facultatif ── */
+.required-asterisk {{
+    color: #dc2626;
+    margin-left: 4px;
+    font-weight: 700;
+}}
+.optional-tag {{
+    color: #94a3b8;
+    font-style: italic;
+    margin-left: 6px;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+}}
+.legende-required {{
+    color: #94a3b8;
+    font-size: 0.72rem;
+    margin: -0.2rem 0 1rem;
+    text-align: right;
+    font-style: italic;
+}}
+
+/* ── Carte météo "auto" plus visible que st.caption ── */
+.meteo-card {{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(56,189,248,0.10);
+    border: 1px solid rgba(56,189,248,0.40);
+    border-radius: 8px;
+    padding: 0.7rem 1rem;
+    color: #e0f2fe;
+    margin: 0.6rem 0 0.4rem;
+    font-size: 0.95rem;
+}}
+.meteo-card strong {{ color: #f97316; font-weight: 700; }}
+
+/* ── Mode localisation : style tab-like pour le radio Adresse/GPS ── */
+div[data-testid="stRadio"][aria-label*="ode"] > div,
+.mode-loc-radio div[role="radiogroup"] {{
+    display: flex !important;
+    gap: 6px !important;
+}}
+.mode-loc-radio label {{
+    flex: 1;
+    border: 2px solid #1e293b !important;
+    border-radius: 8px !important;
+    padding: 10px 14px !important;
+    background: #0f172a !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease;
+    text-align: center;
+}}
+.mode-loc-radio label:hover {{
+    border-color: #fb923c !important;
+}}
+.mode-loc-radio label:has(input:checked) {{
+    border-color: #f97316 !important;
+    background: rgba(249,115,22,0.18) !important;
+    color: #f97316 !important;
+    font-weight: 700;
+    box-shadow: 0 0 0 1px #f97316;
+}}
+
+/* ── Focus accessibilite (RGAA) : visible au clavier ── */
+button:focus-visible,
+input:focus-visible,
+[role="option"]:focus-visible,
+[data-baseweb="select"] > div:focus-visible {{
+    outline: 2px solid #f97316 !important;
+    outline-offset: 2px !important;
+}}
+
+/* ── Contraste WCAG : remonter le gris des field-label ── */
+.field-label {{ color: #cbd5e1 !important; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -595,19 +720,25 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ── FORMULAIRE ────────────────────────────────────────────────────────────────
+st.markdown(
+    '<div class="legende-required">'
+    '<span class="required-asterisk">*</span> champs obligatoires'
+    '</div>',
+    unsafe_allow_html=True,
+)
 col1, col2 = st.columns(2, gap="large")
 
 with col1:
     st.markdown(section_label("warning", "Contexte de l'accident"), unsafe_allow_html=True)
 
-    st.markdown(field_label("sun", "Luminosité"), unsafe_allow_html=True)
+    st.markdown(field_label("sun", "Luminosité", required=True), unsafe_allow_html=True)
     lum = st.selectbox("Luminosité", options=[1,2,3,4,5], label_visibility="collapsed",
         format_func=lambda x: {
             1:"Plein jour", 2:"Crépuscule / aube",
             3:"Nuit sans éclairage", 4:"Nuit — éclairage non allumé",
             5:"Nuit — éclairage allumé"}[x])
 
-    st.markdown(field_label("map-pin", "Localisation"), unsafe_allow_html=True)
+    st.markdown(field_label("map-pin", "Localisation", required=True), unsafe_allow_html=True)
     _agg_opts = [1, 2]
     _agg_default_idx = _agg_opts.index(st.session_state.agg_inferred) if st.session_state.agg_inferred in _agg_opts else 0
     agg = st.selectbox(
@@ -619,35 +750,35 @@ with col1:
         help="Auto-détecté depuis l'adresse si vous utilisez le mode Adresse" if st.session_state.agg_inferred else None,
     )
 
-    st.markdown(field_label("cloud", "Conditions météo"), unsafe_allow_html=True)
+    st.markdown(field_label("cloud", "Conditions météo", required=True), unsafe_allow_html=True)
     atm = st.selectbox("Conditions météo", options=[1,2,3,4,5,6,7,8], label_visibility="collapsed",
         format_func=lambda x: {
             1:"Normale", 2:"Pluie légère", 3:"Pluie forte",
             4:"Neige / grêle", 5:"Brouillard", 6:"Vent fort",
             7:"Temps éblouissant", 8:"Temps couvert"}[x])
 
-    st.markdown(field_label("zap", "Type de collision"), unsafe_allow_html=True)
+    st.markdown(field_label("zap", "Type de collision", required=True), unsafe_allow_html=True)
     col_acc = st.selectbox("Type de collision", options=[1,2,3,4,5,6,7], label_visibility="collapsed",
         format_func=lambda x: {
             1:"Frontale (2 véh.)", 2:"Par l'arrière (2 véh.)",
             3:"Par le côté (2 véh.)", 4:"En chaîne (3 véh.)",
             5:"Multiples (3 véh.)", 6:"Autre", 7:"Sans collision"}[x])
 
-    st.markdown(field_label("road", "Catégorie de route"), unsafe_allow_html=True)
+    st.markdown(field_label("road", "Catégorie de route", required=True), unsafe_allow_html=True)
     catr = st.selectbox("Catégorie de route", options=[1,2,3,4,5,6,7], label_visibility="collapsed",
         format_func=lambda x: {
             1:"Autoroute", 2:"Route nationale", 3:"Route départementale",
             4:"Voie communale", 5:"Hors réseau public",
             6:"Parc de stationnement", 7:"Route métropole urbaine"}[x])
 
-    st.markdown(field_label("road", "Vitesse max autorisée"), unsafe_allow_html=True)
+    st.markdown(field_label("gauge", "Vitesse max autorisée", required=True), unsafe_allow_html=True)
     vma = st.selectbox(
         "VMA", options=[30, 50, 70, 80, 90, 110, 130], index=1,
         label_visibility="collapsed",
         format_func=lambda x: f"{x} km/h",
     )
 
-    st.markdown(field_label("cloud", "État de la surface"), unsafe_allow_html=True)
+    st.markdown(field_label("cloud", "État de la surface", required=True), unsafe_allow_html=True)
     surf = st.selectbox(
         "Surface", options=[1, 2, 3, 4, 5, 6, 7, 8, 9],
         label_visibility="collapsed",
@@ -661,17 +792,17 @@ with col1:
 with col2:
     st.markdown(section_label("person", "Profil de l'usager"), unsafe_allow_html=True)
 
-    st.markdown(field_label("user", "Catégorie d'usager"), unsafe_allow_html=True)
+    st.markdown(field_label("user", "Catégorie d'usager", required=True), unsafe_allow_html=True)
     catu = st.selectbox("Catégorie d'usager", options=[1,2,3,4], label_visibility="collapsed",
         format_func=lambda x: {
             1:"Conducteur", 2:"Passager",
             3:"Piéton", 4:"Piéton en roller / trottinette"}[x])
 
-    st.markdown(field_label("users", "Sexe"), unsafe_allow_html=True)
+    st.markdown(field_label("users", "Sexe", required=True), unsafe_allow_html=True)
     sexe = st.selectbox("Sexe", options=[1,2], label_visibility="collapsed",
         format_func=lambda x: {1:"Masculin", 2:"Féminin"}[x])
 
-    st.markdown(field_label("car", "Catégorie de véhicule"), unsafe_allow_html=True)
+    st.markdown(field_label("car", "Catégorie de véhicule", required=True), unsafe_allow_html=True)
     catv = st.selectbox("Catégorie de véhicule",
         options=[7, 10, 1, 2, 30, 31, 32, 50, 60, 33, 34, 35, 36, 13, 14, 3, 99],
         label_visibility="collapsed",
@@ -694,7 +825,7 @@ with col2:
             3:  "Voiture légère (3 places)",
             99: "Autre"}[x])
 
-    st.markdown(field_label("shield", "Équipement de sécurité"), unsafe_allow_html=True)
+    st.markdown(field_label("shield", "Équipement de sécurité", required=True), unsafe_allow_html=True)
     st.markdown('<div style="font-size:0.72rem;color:#475569;margin-bottom:4px;">Sélectionnez tout ce qui s\'applique</div>', unsafe_allow_html=True)
     secu_choices = st.multiselect("Équipement de sécurité",
         options=[0,1,2,3,4,5,6,7,9],
@@ -711,14 +842,14 @@ with col2:
         secu_choices = [x for x in secu_choices if x != 0]
     secu1 = secu_choices[0] if secu_choices else 0
 
-    st.markdown(field_label("compass", "Motif du déplacement"), unsafe_allow_html=True)
+    st.markdown(field_label("compass", "Motif du déplacement", required=True), unsafe_allow_html=True)
     trajet = st.selectbox("Motif du déplacement", options=[1,2,3,4,5,9], label_visibility="collapsed",
         format_func=lambda x: {
             1:"Domicile–Travail", 2:"Domicile–École",
             3:"Courses / achats", 4:"Professionnel",
             5:"Promenade / loisirs", 9:"Autre"}[x])
 
-    st.markdown(field_label("age", "Âge"), unsafe_allow_html=True)
+    st.markdown(field_label("age", "Âge", required=True), unsafe_allow_html=True)
     age = st.number_input("Âge", min_value=15, max_value=100, value=35, label_visibility="collapsed")
 
 # ── Valeurs fixes (cachees de l'UI : surface technique, peu impactantes) ─────
@@ -742,36 +873,46 @@ MOIS_NOMS = {
     9:"Septembre", 10:"Octobre", 11:"Novembre", 12:"Décembre"
 }
 
-c_jour, c_heure, c_mois = st.columns(3, gap="large")
+c_jour, c_heure, c_mois, c_annee = st.columns(4, gap="large")
 with c_jour:
-    st.markdown(field_label("calendar", "Jour du mois"), unsafe_allow_html=True)
+    st.markdown(field_label("calendar", "Jour du mois", required=True), unsafe_allow_html=True)
     jour = st.number_input("Jour", min_value=1, max_value=31, value=15, label_visibility="collapsed")
 with c_heure:
-    st.markdown(field_label("clock", "Heure de l'accident"), unsafe_allow_html=True)
+    st.markdown(field_label("clock", "Heure de l'accident", required=True), unsafe_allow_html=True)
     heure = st.slider("Heure", min_value=0, max_value=23, value=12,
         label_visibility="collapsed",
         format="%dh00")
     st.markdown(f'<div style="text-align:center;color:#f97316;font-size:1.1rem;font-weight:600;margin-top:-8px;">{heure:02d}h00</div>', unsafe_allow_html=True)
 with c_mois:
-    st.markdown(field_label("month", "Mois de l'accident"), unsafe_allow_html=True)
+    st.markdown(field_label("month", "Mois de l'accident", required=True), unsafe_allow_html=True)
     mois = st.selectbox("Mois", options=list(range(1,13)),
         label_visibility="collapsed",
         format_func=lambda x: MOIS_NOMS[x],
         index=5)
+with c_annee:
+    st.markdown(field_label("calendar", "Année", required=True), unsafe_allow_html=True)
+    annee = st.selectbox(
+        "Année", options=[2022, 2023, 2024, 2025, 2026],
+        index=2,  # default 2024
+        label_visibility="collapsed",
+    )
 
 # ── LOCALISATION (adresse OU GPS) ─────────────────────────────────────────────
 st.markdown(section_label("map-pin", "Localisation (améliore la prédiction via OSRM réel)"), unsafe_allow_html=True)
 
+st.markdown('<div class="mode-loc-radio">', unsafe_allow_html=True)
 mode_loc = st.radio(
-    "Mode",
+    "Mode de localisation",
     ["📍 Adresse", "🌐 Coordonnées GPS"],
     horizontal=True,
     label_visibility="collapsed",
     key="mode_loc",
 )
+st.markdown('</div>', unsafe_allow_html=True)
 
 if mode_loc == "📍 Adresse":
-    c_addr, c_btn = st.columns([4, 1], gap="small")
+    st.markdown(field_label("map-pin", "Adresse", optional=True), unsafe_allow_html=True)
+    c_addr, c_btn = st.columns([4, 1], gap="small", vertical_alignment="bottom")
     with c_addr:
         addr_input = st.text_input(
             "Adresse",
@@ -780,7 +921,6 @@ if mode_loc == "📍 Adresse":
             key="addr_input",
         )
     with c_btn:
-        st.markdown('<div style="height:6px"></div>', unsafe_allow_html=True)
         do_geocode = st.button("🔍 Localiser", use_container_width=True)
 
     if do_geocode and addr_input:
@@ -835,31 +975,49 @@ with btn_col:
 
 # ── RÉSULTAT ──────────────────────────────────────────────────────────────────
 if predict:
-    # ETAPE 1 : Calcul OSRM (temps intervention reels AVANT la prediction)
+    # Localisation explicite ? (geocodage reussi en mode Adresse OU mode GPS)
+    location_explicit = (mode_loc == "🌐 Coordonnées GPS") or bool(st.session_state.geo_label)
+
+    # ETAPE 1 : Calcul OSRM (uniquement si localisation explicite)
     routes_info, best_centre, top_centres = None, None, None
-    temps_interv = 15.0  # defaut si pas de centres
     nearest_sau = 15.0
     nearest_pomp = 15.0
 
-    if lat_input and lon_input:
+    if location_explicit and lat_input and lon_input:
         with st.spinner("Calcul des temps d'intervention (OSRM)..."):
             routes_info, best_centre, top_centres = compute_nearest_centres(lat_input, lon_input, n_per_type=1)
         if best_centre:
             temps_interv = best_centre["duration_min"]
-            # Separer SAU / pompiers
             sau_routes = [r for r in routes_info if r["type"] == "urgences_sau"]
             pomp_routes = [r for r in routes_info if r["type"] == "pompiers"]
             nearest_sau = sau_routes[0]["duration_min"] if sau_routes else temps_interv
             nearest_pomp = pomp_routes[0]["duration_min"] if pomp_routes else temps_interv
-
-    # ETAPE 1b : Meteo auto via Open-Meteo (fallback si pas de lat/lon ou API KO)
-    with st.spinner("Recuperation des conditions meteo..."):
-        temperature, precipitation, windspeed = get_weather_from_openmeteo(
-            lat_input, lon_input, jour, mois,
+    else:
+        st.info(
+            "ℹ️ Sans adresse ni coordonnées GPS, les temps d'intervention OSRM "
+            "ne seront pas calculés et la météo locale ne sera pas récupérée. "
+            "La prédiction se basera sur des valeurs neutres."
         )
-    st.caption(
-        f"Meteo auto : {temperature:.1f}°C — {precipitation:.1f}mm — {windspeed:.0f} km/h"
-    )
+
+    # ETAPE 1b : Meteo auto via Open-Meteo (uniquement si localisation explicite)
+    if location_explicit and lat_input and lon_input:
+        with st.spinner("Récupération des conditions météo..."):
+            temperature, precipitation, windspeed = get_weather_from_openmeteo(
+                lat_input, lon_input, jour, mois, annee,
+            )
+        st.markdown(
+            f'<div class="meteo-card">'
+            f'{ICONS["cloud"]} '
+            f'Météo récupérée automatiquement : '
+            f'<strong>{temperature:.1f}°C</strong>, '
+            f'<strong>{precipitation:.1f} mm</strong>, '
+            f'<strong>{windspeed:.0f} km/h</strong>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        # fallback neutre, pas de carte affichee
+        temperature, precipitation, windspeed = 15.0, 0.0, 10.0
 
     # ETAPE 1c : circ auto-deduit depuis la categorie de route
     # autoroute -> chaussees separees (3) ; sinon -> bidirectionnelle (2)
@@ -881,34 +1039,52 @@ if predict:
         "nearest_pompiers_min": nearest_pomp,
         "nearest_sau_min": nearest_sau,
     }
+    response = None
     try:
         response = requests.post(
             f"{API_URL}/predict",
             json=payload,
             headers=api_headers(),
-            timeout=10
+            timeout=10,
         )
-        result = response.json()
-
-        # Stocker dans session_state pour persistance
-        st.session_state.last_result = result
-        st.session_state.last_routes = routes_info
-        st.session_state.last_best = best_centre
-        st.session_state.last_coords = (lat_input, lon_input)
-
-        # ETAPE 3 : Affichage resultat
-        if result["label"] == "Grave":
-            st.error(f"Accident **GRAVE** predit -- Probabilite : **{result['probability']}%**")
-        else:
-            st.success(f"Accident **PAS GRAVE** predit -- Probabilite : **{result['probability']}%**")
-
-        if st.session_state.jwt_token:
-            st.caption("Prediction sauvegardee dans votre historique.")
-        else:
-            st.caption("Connectez-vous pour sauvegarder vos predictions.")
-
+    except requests.exceptions.Timeout:
+        st.error("⏱️ Le serveur met trop de temps à répondre. Veuillez réessayer dans un instant.")
+    except requests.exceptions.ConnectionError:
+        st.error("🔌 Impossible de joindre l'API. Vérifiez que le serveur est lancé puis réessayez.")
     except Exception as e:
-        st.warning(f"Impossible de contacter l'API : {e}")
+        st.error(f"❌ Erreur inattendue lors de l'appel à l'API. Détail technique : {e}")
+
+    if response is not None:
+        if response.status_code == 401:
+            st.error("🔐 Votre session a expiré. Veuillez vous reconnecter via la sidebar.")
+        elif response.status_code == 422:
+            st.error("⚠️ Données du formulaire invalides. Vérifiez les bornes des champs (âge, vitesse, etc.).")
+        elif response.status_code >= 500:
+            st.error("🛠️ Le serveur est indisponible. Veuillez réessayer dans quelques instants.")
+        elif response.status_code != 200:
+            st.error(
+                f"⚠️ Erreur inattendue de l'API (code {response.status_code}). "
+                "Veuillez réessayer ou contacter le support."
+            )
+        else:
+            result = response.json()
+
+            # Stocker dans session_state pour persistance
+            st.session_state.last_result = result
+            st.session_state.last_routes = routes_info
+            st.session_state.last_best = best_centre
+            st.session_state.last_coords = (lat_input, lon_input)
+
+            # ETAPE 3 : Affichage resultat
+            if result["label"] == "Grave":
+                st.error(f"Accident **GRAVE** predit -- Probabilite : **{result['probability']}%**")
+            else:
+                st.success(f"Accident **PAS GRAVE** predit -- Probabilite : **{result['probability']}%**")
+
+            if st.session_state.jwt_token:
+                st.caption("Prediction sauvegardee dans votre historique.")
+            else:
+                st.caption("Connectez-vous pour sauvegarder vos predictions.")
 
 # ── CARTE PERSISTANTE (affichee tant qu'un resultat existe) ──────
 if st.session_state.last_result and st.session_state.last_routes and st.session_state.last_coords:
@@ -1089,7 +1265,13 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     if st.session_state.jwt_token:
-        st.success(f"Connecte : {st.session_state.user_email}")
+        st.markdown(
+            f'<div class="connected-card">'
+            f'<div class="connected-card-label">Connecté</div>'
+            f'<div class="connected-card-email">{st.session_state.user_email}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
         if st.button("Historique des predictions", use_container_width=True):
             st.session_state.page = "historique"
         if st.button("Mes donnees RGPD", use_container_width=True):
