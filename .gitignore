@@ -63,3 +63,10 @@ rapports perso routezone/
 # Sauvegardes temporaires
 installed_OLD.txt
 requirements_OLD.txt
+
+# === Brouillons perso ===
+wins.md
+arborescence.txt
+
+# === Notebooks - dossier vide local ===
+notebooks/models/
