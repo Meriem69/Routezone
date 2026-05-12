@@ -8,6 +8,8 @@ from streamlit_folium import st_folium
 from math import radians, sin, cos, sqrt, atan2
 from pathlib import Path
 import base64
+import datetime as dt
+import json
 import os
 
 st.set_page_config(
@@ -137,6 +139,52 @@ def _infer_vma(agg: int, catr: int) -> int:
     if agg == 2:            # quasi tout le reste en ville
         return 50
     return 80               # rural par defaut
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def get_weather_from_openmeteo(lat, lon, jour: int, mois: int):
+    """Recupere temperature / precipitations / vent via Open-Meteo.
+
+    - Si lat/lon manquants ou API en erreur -> fallback (15.0, 0.0, 10.0).
+    - Date >7 jours dans le passe -> endpoint archive ; sinon forecast.
+    - Renvoie (temperature [°C], precipitation [mm], windspeed [km/h]).
+    """
+    fallback = (15.0, 0.0, 10.0)
+    if lat is None or lon is None:
+        return fallback
+    try:
+        year = dt.date.today().year
+        try:
+            target = dt.date(year, int(mois), int(jour))
+        except (ValueError, TypeError):
+            target = dt.date(year, int(mois) if 1 <= int(mois) <= 12 else 6, 15)
+        today = dt.date.today()
+        if target < today - dt.timedelta(days=7):
+            url = "https://archive-api.open-meteo.com/v1/archive"
+        else:
+            url = "https://api.open-meteo.com/v1/forecast"
+        params = {
+            "latitude": float(lat),
+            "longitude": float(lon),
+            "start_date": target.isoformat(),
+            "end_date": target.isoformat(),
+            "daily": "temperature_2m_mean,precipitation_sum,wind_speed_10m_max",
+            "timezone": "Europe/Paris",
+        }
+        r = requests.get(url, params=params, timeout=5)
+        if r.status_code != 200:
+            return fallback
+        daily = r.json().get("daily", {})
+        temp = daily.get("temperature_2m_mean", [None])[0]
+        prec = daily.get("precipitation_sum", [None])[0]
+        wind = daily.get("wind_speed_10m_max", [None])[0]
+        return (
+            float(temp) if temp is not None else fallback[0],
+            float(prec) if prec is not None else fallback[1],
+            float(wind) if wind is not None else fallback[2],
+        )
+    except Exception:
+        return fallback
 
 
 @st.cache_data(show_spinner=False)
@@ -509,6 +557,28 @@ div[data-testid="stAlert"] {{
     padding: 1rem 0 0.5rem;
     opacity: 0.7;
 }}
+
+/* ── SIDEBAR : aligner sur le dark theme du main ── */
+section[data-testid="stSidebar"] {{
+    background-color: #0a0e1a !important;
+    border-right: 1px solid #1e293b !important;
+}}
+section[data-testid="stSidebar"] * {{
+    color: #e2e8f0;
+}}
+section[data-testid="stSidebar"] .stTextInput input,
+section[data-testid="stSidebar"] .stSelectbox > div > div,
+section[data-testid="stSidebar"] [data-baseweb="input"] input {{
+    background-color: #111827 !important;
+    color: #e2e8f0 !important;
+    border: 1px solid #1e293b !important;
+}}
+section[data-testid="stSidebar"] label {{
+    color: #94a3b8 !important;
+}}
+section[data-testid="stSidebar"] .stRadio label {{
+    color: #e2e8f0 !important;
+}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -569,6 +639,24 @@ with col1:
             1:"Autoroute", 2:"Route nationale", 3:"Route départementale",
             4:"Voie communale", 5:"Hors réseau public",
             6:"Parc de stationnement", 7:"Route métropole urbaine"}[x])
+
+    st.markdown(field_label("road", "Vitesse max autorisée"), unsafe_allow_html=True)
+    vma = st.selectbox(
+        "VMA", options=[30, 50, 70, 80, 90, 110, 130], index=1,
+        label_visibility="collapsed",
+        format_func=lambda x: f"{x} km/h",
+    )
+
+    st.markdown(field_label("cloud", "État de la surface"), unsafe_allow_html=True)
+    surf = st.selectbox(
+        "Surface", options=[1, 2, 3, 4, 5, 6, 7, 8, 9],
+        label_visibility="collapsed",
+        format_func=lambda x: {
+            1: "Normale", 2: "Mouillée", 3: "Flaques",
+            4: "Inondée", 5: "Enneigée", 6: "Boue",
+            7: "Verglacée", 8: "Corps gras / huile", 9: "Autre",
+        }[x],
+    )
 
 with col2:
     st.markdown(section_label("person", "Profil de l'usager"), unsafe_allow_html=True)
@@ -633,10 +721,17 @@ with col2:
     st.markdown(field_label("age", "Âge"), unsafe_allow_html=True)
     age = st.number_input("Âge", min_value=15, max_value=100, value=35, label_visibility="collapsed")
 
-# Valeurs par défaut
-int_acc = 1; circ = 1; vosp = 0; prof = 1; plan = 1
-surf = 1; infra = 0; situ = 1; vma = 50
-temperature = 15.0; precipitation = 0.0; windspeed = 10.0
+# ── Valeurs fixes (cachees de l'UI : surface technique, peu impactantes) ─────
+# vma + surf viennent maintenant des selectbox dans "Contexte de l'accident".
+# circ est recalcule au moment de la prediction selon catr.
+# temperature / precipitation / windspeed sont recuperees via Open-Meteo.
+int_acc = 1   # Hors intersection
+circ = 2      # Bidirectionnelle (recalculee selon catr a la prediction)
+vosp = 0      # Sans objet
+prof = 1      # Plat
+plan = 1      # Rectiligne
+infra = 0     # Aucun
+situ = 1      # Sur chaussee
 
 # ── DONNÉES TEMPORELLES ───────────────────────────────────────────────────────
 st.markdown(section_label("calendar", "Données temporelles"), unsafe_allow_html=True)
@@ -756,6 +851,19 @@ if predict:
             pomp_routes = [r for r in routes_info if r["type"] == "pompiers"]
             nearest_sau = sau_routes[0]["duration_min"] if sau_routes else temps_interv
             nearest_pomp = pomp_routes[0]["duration_min"] if pomp_routes else temps_interv
+
+    # ETAPE 1b : Meteo auto via Open-Meteo (fallback si pas de lat/lon ou API KO)
+    with st.spinner("Recuperation des conditions meteo..."):
+        temperature, precipitation, windspeed = get_weather_from_openmeteo(
+            lat_input, lon_input, jour, mois,
+        )
+    st.caption(
+        f"Meteo auto : {temperature:.1f}°C — {precipitation:.1f}mm — {windspeed:.0f} km/h"
+    )
+
+    # ETAPE 1c : circ auto-deduit depuis la categorie de route
+    # autoroute -> chaussees separees (3) ; sinon -> bidirectionnelle (2)
+    circ = 3 if catr == 1 else 2
 
     # ETAPE 2 : Prediction avec les vrais temps OSRM (passes au modele V3)
     payload = {
@@ -976,8 +1084,7 @@ with st.sidebar:
     st.markdown(f"""
     <div style="text-align:center;margin-bottom:1.5rem;">
         <div style="font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:3px;
-            background:linear-gradient(90deg,#fff,#fdba74);-webkit-background-clip:text;
-            -webkit-text-fill-color:transparent;">ROUTEZONE</div>
+            color:#f97316;">ROUTEZONE</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -985,11 +1092,16 @@ with st.sidebar:
         st.success(f"Connecte : {st.session_state.user_email}")
         if st.button("Historique des predictions", use_container_width=True):
             st.session_state.page = "historique"
+        if st.button("Mes donnees RGPD", use_container_width=True):
+            st.session_state.page = "rgpd"
         if st.button("Deconnexion", use_container_width=True):
             st.session_state.jwt_token = None
             st.session_state.user_email = None
             st.session_state.user_id = None
             st.session_state.page = "prediction"
+            # purge des donnees RGPD eventuellement en cache de session
+            for k in ("rgpd_export_data", "rgpd_export_count", "rgpd_delete_confirm"):
+                st.session_state.pop(k, None)
             st.rerun()
     else:
         st.markdown("---")
@@ -1096,6 +1208,95 @@ if st.session_state.page == "historique" and st.session_state.jwt_token:
         st.error("API inaccessible")
 
     if st.button("Retour aux predictions"):
+        st.session_state.page = "prediction"
+        st.rerun()
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE RGPD : export + suppression des predictions de l'utilisateur connecte
+# ══════════════════════════════════════════════════════════════════════════════
+if st.session_state.page == "rgpd" and st.session_state.jwt_token:
+    st.markdown("---")
+    st.subheader("Mes donnees personnelles (RGPD)")
+
+    st.markdown("""
+Conformement au **Reglement General sur la Protection des Donnees** :
+
+- **Article 15 (droit d'acces)** et **article 20 (portabilite)** : vous pouvez
+  exporter toutes vos predictions au format JSON.
+- **Article 17 (droit a l'oubli)** : vous pouvez demander la suppression
+  definitive de toutes vos predictions enregistrees.
+""")
+
+    col_export, col_delete = st.columns(2)
+
+    # ── Export ─────────────────────────────────────────────────────
+    with col_export:
+        st.markdown("#### Exporter mes predictions")
+        if st.button("Recuperer mes donnees", use_container_width=True, key="rgpd_export_btn"):
+            try:
+                r = requests.get(
+                    f"{API_URL}/me/predictions/export",
+                    headers=api_headers(),
+                    timeout=15,
+                )
+                if r.status_code == 200:
+                    payload = r.json()
+                    # accepte {"predictions": [...]} ou liste brute
+                    preds = payload.get("predictions", payload) if isinstance(payload, dict) else payload
+                    nb = len(preds) if isinstance(preds, list) else 0
+                    st.session_state["rgpd_export_data"] = payload
+                    st.session_state["rgpd_export_count"] = nb
+                    st.success(f"{nb} prediction(s) recuperee(s).")
+                elif r.status_code == 401:
+                    st.error("Session expiree. Reconnectez-vous.")
+                else:
+                    st.error(f"Erreur API ({r.status_code}) : {r.text[:200]}")
+            except Exception as e:
+                st.error(f"API inaccessible : {e}")
+
+        if "rgpd_export_data" in st.session_state:
+            st.caption(f"{st.session_state.get('rgpd_export_count', 0)} prediction(s) prete(s) au telechargement.")
+            st.download_button(
+                "Telecharger en JSON",
+                data=json.dumps(st.session_state["rgpd_export_data"], indent=2, ensure_ascii=False),
+                file_name=f"routezone_predictions_{st.session_state.user_email}.json",
+                mime="application/json",
+                use_container_width=True,
+                key="rgpd_export_download",
+            )
+
+    # ── Suppression ────────────────────────────────────────────────
+    with col_delete:
+        st.markdown("#### Supprimer toutes mes predictions")
+        st.markdown("Action **irreversible**. Vos predictions ne seront plus disponibles.")
+        confirm = st.checkbox("Je confirme vouloir supprimer mes donnees", key="rgpd_delete_confirm")
+        if st.button(
+            "Supprimer definitivement",
+            use_container_width=True,
+            disabled=not confirm,
+            key="rgpd_delete_btn",
+        ):
+            try:
+                r = requests.delete(
+                    f"{API_URL}/me/predictions",
+                    headers=api_headers(),
+                    timeout=10,
+                )
+                if r.status_code == 200:
+                    payload = r.json() if r.text else {}
+                    n = payload.get("deleted", payload.get("count", 0))
+                    st.success(f"{n} prediction(s) supprimee(s).")
+                    # purge le cache export de session
+                    for k in ("rgpd_export_data", "rgpd_export_count"):
+                        st.session_state.pop(k, None)
+                elif r.status_code == 401:
+                    st.error("Session expiree. Reconnectez-vous.")
+                else:
+                    st.error(f"Erreur API ({r.status_code}) : {r.text[:200]}")
+            except Exception as e:
+                st.error(f"API inaccessible : {e}")
+
+    if st.button("Retour aux predictions", key="rgpd_back_btn"):
         st.session_state.page = "prediction"
         st.rerun()
 
