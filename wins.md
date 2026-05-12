@@ -42,16 +42,24 @@
 
 ### 10 mai 2026 (dimanche) 
 
-- Création du module `src/api/logger.py` (config logger Python : INFO + console + fichier)
-- Logger intégré dans `main.py` (démarrage API) et `routes_ia.py` (chaque prédiction)
-- Fichier `logs/api.log` se remplit automatiquement à chaque action de l'API
-- 29/29 tests pytest passent toujours
-- Compris :
-  - Logger Python (niveau, handler, format)
-  - Différence niveau (filtre) vs handler (destination)
-  - Pourquoi on ne push PAS les logs sur Git (sensibles + bruyants)
-  - Que mes logs prouvent le déterminisme du modèle
-- Commit f4bad3e push sur master
+## 10 mai 2026 — Monitoring complet
+
+- Logging structuré opérationnel (logs/api.log se remplit auto)
+- Lib prometheus_client installée + 4 métriques définies dans metrics.py
+- Endpoint /metrics ajouté dans main.py
+- Container Prometheus (port 9090) + config monitoring/prometheus.yml
+- Container Grafana (port 3000) connecté à Prometheus
+- Sécurité Grafana via .env (.env.example créé pour onboarding)
+- Dashboard Grafana "RouteZone Monitoring" avec 5 panels :
+  * Nombre total de prédictions (Stat)
+  * Prédictions par classe (Bar chart)
+  * Latence moyenne (Stat)
+  * Prédictions par minute (Time series)
+  * Total des erreurs (Stat)
+- 14 prédictions test faites depuis Swagger pour générer du trafic
+- 2 commits push sur master
+- Compris : différence logging vs Prometheus, Counter vs Histogram,
+  scraping toutes les 15s, stratégie de monitoring multi-niveaux
 
 
 ### A revoir : 

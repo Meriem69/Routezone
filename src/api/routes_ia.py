@@ -266,3 +266,66 @@ def list_predictions(limit: int = 50, user: dict = Depends(get_current_user)):
             "prediction": r[16], "label": r[17], "probability": r[18], "model_version": r[19],
         } for r in rows]
     }
+
+# ── RGPD : Droit a l'oubli ───────────────────────────────────────────
+@router.delete("/me/predictions", tags=["RGPD"])
+def delete_my_predictions(user: dict = Depends(get_current_user)):
+    """
+    Supprime toutes les predictions de l'utilisateur connecte.
+    Conforme RGPD article 17 (droit a l'effacement).
+    """
+    logger.info(f"RGPD : demande de suppression des predictions pour user_id={user['id']}")
+    
+    with engine.begin() as conn:
+        result = conn.execute(text("""
+            DELETE FROM predictions WHERE user_id = :uid
+        """), {"uid": user["id"]})
+        nb_supprimees = result.rowcount
+    
+    logger.info(f"RGPD : {nb_supprimees} predictions supprimees pour user_id={user['id']}")
+    
+    return {
+        "message": "Vos predictions ont ete supprimees conformement au RGPD",
+        "nombre_predictions_supprimees": nb_supprimees,
+        "user_id": user["id"]
+    }
+
+
+# ── RGPD : Droit a la portabilite ────────────────────────────────────
+@router.get("/me/predictions/export", tags=["RGPD"])
+def export_my_predictions(user: dict = Depends(get_current_user)):
+    """
+    Exporte toutes les predictions de l'utilisateur connecte au format JSON.
+    Conforme RGPD article 20 (droit a la portabilite).
+    """
+    logger.info(f"RGPD : demande d'export des predictions pour user_id={user['id']}")
+    
+    with engine.connect() as conn:
+        rows = conn.execute(text("""
+            SELECT id, created_at, lum, agg, atm, col, catr, vma, catu, sexe, 
+                   age, heure, mois, jour, lat, lon, prediction, label, probability, model_version
+            FROM predictions WHERE user_id = :uid
+            ORDER BY created_at DESC
+        """), {"uid": user["id"]}).fetchall()
+    
+    logger.info(f"RGPD : export de {len(rows)} predictions pour user_id={user['id']}")
+    
+    return {
+        "user_id": user["id"],
+        "export_date": datetime.now().isoformat(),
+        "rgpd_article": "Article 20 - Droit a la portabilite",
+        "total_predictions": len(rows),
+        "predictions": [{
+            "id": r[0],
+            "date": r[1].isoformat() if r[1] else None,
+            "inputs": {
+                "lum": r[2], "agg": r[3], "atm": r[4], "col": r[5], "catr": r[6],
+                "vma": r[7], "catu": r[8], "sexe": r[9], "age": r[10], "heure": r[11],
+                "mois": r[12], "jour": r[13], "lat": r[14], "lon": r[15]
+            },
+            "prediction": r[16],
+            "label": r[17],
+            "probability": r[18],
+            "model_version": r[19]
+        } for r in rows]
+    }
