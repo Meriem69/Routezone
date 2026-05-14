@@ -40,8 +40,8 @@ graph TB
         NB04["04 Temps intervention<br/>Golden Hour + comparaison Hav/OSRM"]
         NB05["05 Modelisation V1<br/>(original)"]
         NB06["06 MLflow tuning V1<br/>(original)"]
-        NB07["07 Modelisation V2<br/>Veille desequilibre Haversine"]
-        NB08["08 Modelisation V3<br/>OSRM + Optuna recall+ES"]
+        NB07["07 Modelisation V3 OSRM<br/>+ Veille desequilibre"]
+        NB08["08 MLflow tuning<br/>4 methodes comparees"]
     end
 
     subgraph Infra["Infrastructure"]
@@ -93,7 +93,7 @@ flowchart LR
         B1["Nettoyage<br/>doublons, NaN"]
         B2["Binarisation<br/>GRAVE / PAS GRAVE"]
         B3["Feature engineering"]
-        B4["Haversine x 1.3<br/>caserne -> accident -> SAU"]
+        B4["OSRM Docker<br/>vrais temps routiers<br/>caserne -> accident -> SAU"]
     end
 
     subgraph Load["3 - Chargement"]
@@ -121,7 +121,7 @@ flowchart TB
 
     JWT --> FORM["Formulaire<br/>dont lat/lon"]
     FORM --> OSRM["OSRM Docker<br/>3 centres les plus proches<br/>vrais temps routiers"]
-    OSRM --> PREDICT["POST /predict<br/>37 features"]
+    OSRM --> PREDICT["POST /predict<br/>34 features"]
     PREDICT --> RESULT["GRAVE / PAS GRAVE<br/>+ probabilite"]
     RESULT --> CARTE["Carte Leaflet<br/>accident + itineraires"]
     PREDICT --> SAVE["Sauvegarde BDD"]
@@ -142,7 +142,7 @@ flowchart TB
 ```mermaid
 flowchart TB
     DATA["dataset 413 570 lignes<br/>+ temps_intervention.csv"]
-    DATA --> FE["Feature Engineering<br/>37 features"]
+    DATA --> FE["Feature Engineering<br/>34 features"]
     FE --> SPLIT["Split temporel<br/>AVANT imputation<br/>34 features"]
 
     SPLIT --> TRAIN["Train 2022-2023<br/>265 064"]
@@ -159,12 +159,12 @@ flowchart TB
     OPTUNA --> MODEL["LightGBM"]
     MODEL --> EVAL["Evaluation test 2024"]
     TEST2 --> EVAL
-    VAL --> CALIB["Calibration isotonic"]
+    VAL --> CALIB["Calibration isotonic<br/>(désactivée 14/05/2026)"]
     MODEL --> CALIB
 
     style SPLIT fill:#dc2626,color:#fff
     style IMPUTE fill:#1e40af,color:#fff
-    style CALIB fill:#059669,color:#fff
+    style CALIB fill:#6b7280,color:#fff
 ```
 
 ---
@@ -206,19 +206,20 @@ OSRM revele aussi **+47% de zones blanches** que Haversine ne voyait pas
 
 ```
               precision    recall  f1-score   support
-   Pas grave       0.94      0.77      0.85    123 037
-       Grave       0.41      0.78      0.54     25 469
-   macro avg       0.68      0.77      0.69    148 506
+  Pas grave       0.94      0.78      0.85    123 037
+      Grave       0.42      0.76      0.54     25 469
+  accuracy                            0.78    148 506
+  macro avg       0.68      0.77      0.70    148 506
 ```
 
 Comparaison historique :
 
 | Metrique | V1* | V2 Haversine | V3 OSRM | Best |
 |---|---:|---:|---:|---|
-| Recall | 0.805 | 0.784 | **0.780** | ~ V2 |
-| Precision | 0.390 | 0.405 | **0.409** | V3 |
-| **F1 macro** | 0.676 | 0.689 | **0.691** | V3 |
-| **AUC-ROC** | 0.850 | 0.855 | **0.857** | V3 |
+| Recall | 0.805 | 0.784 | **0.7643** | ~ V1 |
+| Precision | 0.390 | 0.405 | **0.4166** | V3 |
+| **F1 macro** | 0.676 | 0.689 | **0.6956** | V3 |
+| **AUC-ROC** | 0.850 | 0.855 | **0.8558** | V3 |
 | Gap train-test recall | ? | +9.7% | **+4.25%** | V3 |
 
 *V1 : data leakage (split aleatoire + imputation globale)*
@@ -229,6 +230,12 @@ du modele.
 
 ### Comparaison des 3 strategies V3
 
+**Note** : Plusieurs variantes ont été expérimentées et conservées
+dans `models/` pour traçabilité. **Le modèle V3 OSRM "vanilla"
+(best_model_v3_osrm.pkl) est servi en production** pour sa cohérence
+métier et l'interprétabilité de ses probabilités. Les variantes
+Optuna existent dans le repo mais ne sont pas servies par l'API.
+
 | Approche | Recall | AUC | Gap train-test | Verdict |
 |---|---:|---:|---:|---|
 | V3 vanilla (defaults) | 0.7591 | 0.8554 | +9.7% | Leger overfit |
@@ -238,6 +245,31 @@ du modele.
 Hyperparametres V3 final : `max_depth=9`, `learning_rate=0.012`, `num_leaves=45`,
 `min_child_samples=153`, `subsample=0.74`, `colsample_bytree=0.65`,
 `n_estimators=1000` avec early stopping (patience=50 sur val).
+
+---
+
+## Evolution du modele
+
+### 14 mai 2026 - Desactivation du calibrator isotonique
+
+Un CalibratedClassifierCV avec calibration isotonique avait été
+ajouté au pipeline initial. Après évaluation empirique sur le
+test 2024, j'ai constaté que la calibration dégradait sévèrement
+les performances métier :
+
+| Métrique | Modèle brut | Calibrator isotonic | Delta |
+|---|---:|---:|---:|
+| Recall GRAVE | 0.7643 | 0.3299 | **-0.4344** |
+| Precision GRAVE | 0.4166 | 0.6504 | +0.2338 |
+| F1 macro | 0.6956 | 0.6772 | -0.0185 |
+| AUC-ROC | 0.8558 | 0.8458 | -0.0099 |
+
+Le calibrator faisait passer 67% des accidents réellement graves
+en "Pas grave" — l'inverse de l'objectif métier de sécurité
+routière.
+
+**Décision** : retirer le calibrator du flux de prédiction tout en
+conservant le fichier pour traçabilité (cf. `src/api/routes_ia.py`).
 
 ---
 
@@ -268,7 +300,7 @@ sequenceDiagram
     S->>OSRM: Route vers 3 centres
     OSRM-->>S: Temps + traces
 
-    S->>API: POST /predict (JWT + 37 features)
+    S->>API: POST /predict (JWT + 34 features)
     API->>API: LightGBM inference
     API->>DB: INSERT predictions
     API-->>S: label + probability
@@ -347,8 +379,8 @@ routezone/
 │   │                                       # + comparaison Haversine vs OSRM (cells 25-32)
 │   ├── 05_modelisation_v1                  # Baseline RF, XGB, LightGBM (original Meriem)
 │   ├── 06_mlflow_tuning_v1                 # Optuna V1 (original Meriem)
-│   ├── 07_modelisation_v2                  # Veille desequilibre + Haversine
-│   └── 08_modelisation_v3_osrm             # V3 OSRM + Optuna recall+ES
+│   ├── 07_modelisation_v3_osrm             # V3 OSRM + veille desequilibre
+│   └── 08_mlflow_tuning                    # 4 methodes comparees (Tuning manuel, GridSearch, Optuna F1, Optuna Recall)
 ├── src/
 │   ├── api/                                # API unifiee FastAPI
 │   │   ├── main.py
@@ -388,7 +420,7 @@ docker-compose up -d
 # Importer les donnees
 python bdd/import_data.py
 
-# Executer les notebooks 01 a 07 dans Jupyter
+# Executer les notebooks 01 a 08 dans Jupyter (dans l'ordre)
 
 # (Optionnel mais recommande pour V3)
 # Enrichir le dataset avec les vrais temps OSRM (~2h, 22 regions Geofabrik)
@@ -475,13 +507,27 @@ pytest tests/ -v                  # Tests
 
 | Code | Competence | Livrable |
 |------|-----------|---------|
-| C1 | Collecte multi-sources | notebooks 01-04 |
-| C2 | Requetes SQL | routes_data.py |
-| C3 | Nettoyage et transformation | notebooks 01, 04 |
-| C4 | Base de donnees | create_db.sql, PostgreSQL |
-| C5 | API REST securisee | routes_data.py |
-| C8-C9 | Service IA + API IA | routes_ia.py, notebook 07 |
-| C10 | Application IA | app.py |
+| C1 | Automatiser l'extraction de donnees | notebooks 01-04 |
+| C2 | Identifier les sources fiables | notebooks 01-04 |
+| C3 | Nettoyer et transformer les donnees | notebooks 01-04 |
+| C4 | Creer une base de donnees | bdd/create_db.sql, PostgreSQL |
+| C5 | Developper une API REST | src/api/routes_data.py |
+| C6 | Organiser une veille technologique | docs/actualite.md |
+| C7 | Benchmark et recommandation | rapport E2 (en cours) |
+| C8 | Parametrer un service IA | notebooks 05-08, models/ |
+| C9 | Developper un modele ML | notebook 07 (LightGBM V3 OSRM) |
+| C10 | Encapsuler le modele dans une API | src/api/routes_ia.py |
+| C11 | Tester le modele | tests/test_business_logic.py |
+| C12 | Tests automatises | tests/ (34 tests pytest) |
+| C13 | CI/CD du modele | .github/workflows/tests.yml |
+| C14 | Specifications fonctionnelles | docs/SPECS.md (en cours) |
+| C15 | Architecture applicative | README.md (schemas Mermaid) |
+| C16 | Methodologie agile | rapport E4 (en cours) |
+| C17 | Accessibilite et securite | RGAA + JWT + RGPD |
+| C18 | Tester l'application | tests/ (34 tests) |
+| C19 | Integrer l'IA dans l'application | src/app.py (Streamlit) |
+| C20 | Monitoring applicatif | monitoring/ (Prometheus + Grafana) |
+| C21 | Resolution d'incident | docs/incidents/ (en cours) |
 
 ---
 
