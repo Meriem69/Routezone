@@ -35,10 +35,15 @@ v2_path = MODELS_DIR / "best_model_v2.pkl"
 if v3_path.exists():
     model = joblib.load(v3_path)
     features = joblib.load(MODELS_DIR / "features_v3_osrm.pkl")
+    # NOTE TECHNIQUE - Calibrator desactive depuis le 14 mai 2026
+    # Le CalibratedClassifierCV isotonique degradait le Recall sur
+    # la classe GRAVE (76% -> 33%) sur le test 2024 (voir notebook 07
+    # cellule d'evaluation). Le fichier est conserve pour tracabilite
+    # mais n'est plus utilise en prediction.
     cal_path = MODELS_DIR / "calibrator_v3_osrm.pkl"
     calibrator = joblib.load(cal_path) if cal_path.exists() else None
     MODEL_VERSION = "v3_osrm"
-    print(f"Modele V3 OSRM charge : {len(features)} features (calibre: {calibrator is not None})")
+    print(f"Modele V3 OSRM charge : {len(features)} features (calibrator desactive)")
 elif v2_path.exists():
     model = joblib.load(v2_path)
     features = joblib.load(MODELS_DIR / "features_v2.pkl")
@@ -213,7 +218,8 @@ def predict(
             X[col] = X[col].astype(int).astype("category")
 
     start_time = time.time()
-    proba = (calibrator or model).predict_proba(X)[0]
+    # Calibrator desactive (cf. NOTE TECHNIQUE plus haut) : on sert model directement.
+    proba = model.predict_proba(X)[0]
     probability = float(proba[1])
     pred_int = int(probability >= 0.5)
     duration = time.time() - start_time
