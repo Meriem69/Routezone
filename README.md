@@ -15,7 +15,7 @@ RouteZone predit si un accident routier est **grave** (tue ou hospitalise) ou **
 
 Le projet integre une analyse du "golden hour" : correlation prouvee (p < 1e-26 en V3 OSRM) entre le temps d'intervention des secours et le taux de deces.
 
-**Modele en production : V3 OSRM** (LightGBM, recall 0.78, AUC 0.857, gap train-test +4.25%).
+**Modele en production : V3 OSRM** (LightGBM, recall 0.7643, AUC 0.8558, F1 0.6956).
 Les features de temps d'intervention sont calculees avec OSRM (vrais temps routiers,
 153 054 accidents enrichis), remplacant l'approximation Haversine x 1.3 de la V2.
 

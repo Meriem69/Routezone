@@ -29,6 +29,13 @@ MODELS_DIR = Path(os.getenv(
     str(Path(__file__).parent.parent.parent / "models")
 ))
 
+# NOTE TECHNIQUE - 14 mai 2026
+# Modele de prod : best_model_v3_osrm.pkl (nb07, Recall 0.7643 test 2024).
+# Variante Optuna (best_model_v3_optuna_recall.pkl, Recall 0.8091)
+# ecartee malgre +4.5 pts de Recall global : distribution de probas
+# plus conservatrice (plafond ~70% sur cas extremes) reduisant la
+# lisibilite metier des predictions individuelles. V3 OSRM
+# privilegie pour la robustesse de la demo et l'interpretabilite.
 v3_path = MODELS_DIR / "best_model_v3_osrm.pkl"
 v2_path = MODELS_DIR / "best_model_v2.pkl"
 
@@ -201,21 +208,27 @@ def predict(
 
     base["int_feat"] = data.int_
 
-    if MODEL_VERSION in ("v2", "v3_osrm"):
+    if MODEL_VERSION in ("v2", "v3_osrm", "v3_optuna_recall"):
         base.update(compute_derived_features(data))
 
     row = [base.get(f, 0) for f in features]
     X = pd.DataFrame([row], columns=features)
 
-    # Convertir les catégorielles comme pendant le training
-    CAT_FEATURES = [
-        "lum", "agg", "atm", "col", "catr", "circ", "vosp", "prof", "plan",
-        "surf", "infra", "situ", "catu", "sexe", "trajet", "secu1", "catv",
-        "creneau", "age_tranche", "jour_semaine", "int_feat",
-    ]
-    for col in CAT_FEATURES:
-        if col in X.columns:
-            X[col] = X[col].astype(int).astype("category")
+    # Conversion catégorielle : seulement pour les modèles entraînés AVEC
+    # categorical_feature explicite (nb07 V3 OSRM, V2). Le modèle Optuna nb08
+    # a été entraîné sur X.astype(float) — tout doit rester numérique.
+    if MODEL_VERSION in ("v2", "v3_osrm"):
+        CAT_FEATURES = [
+            "lum", "agg", "atm", "col", "catr", "circ", "vosp", "prof", "plan",
+            "surf", "infra", "situ", "catu", "sexe", "trajet", "secu1", "catv",
+            "creneau", "age_tranche", "jour_semaine", "int_feat",
+        ]
+        for col in CAT_FEATURES:
+            if col in X.columns:
+                X[col] = X[col].astype(int).astype("category")
+    else:
+        # Optuna : tout en float (mêmes 34 features mais sans dtype categorical)
+        X = X.astype(float)
 
     start_time = time.time()
     # Calibrator desactive (cf. NOTE TECHNIQUE plus haut) : on sert model directement.

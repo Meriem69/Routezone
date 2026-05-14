@@ -606,6 +606,103 @@ section[data-testid="stSidebar"] .stButton > button:focus {{
     outline-offset: 2px !important;
 }}
 
+/* ── Sidebar : boutons "Se connecter" / "Creer un compte" (form_submit_button) ── */
+/* Au repos : fond noir / bordure grise / texte clair ; au survol : fond orange, texte blanc */
+section[data-testid="stSidebar"] [data-testid="stFormSubmitButton"] button,
+section[data-testid="stSidebar"] button[kind="primaryFormSubmit"],
+section[data-testid="stSidebar"] button[kind="secondaryFormSubmit"] {{
+    background-color: #111827 !important;
+    color: #e2e8f0 !important;
+    border: 1px solid #1e293b !important;
+}}
+section[data-testid="stSidebar"] [data-testid="stFormSubmitButton"] button:hover,
+section[data-testid="stSidebar"] button[kind="primaryFormSubmit"]:hover,
+section[data-testid="stSidebar"] button[kind="secondaryFormSubmit"]:hover {{
+    background-color: #f97316 !important;
+    color: #ffffff !important;
+    border-color: #f97316 !important;
+}}
+section[data-testid="stSidebar"] [data-testid="stFormSubmitButton"] button:focus,
+section[data-testid="stSidebar"] button[kind="primaryFormSubmit"]:focus,
+section[data-testid="stSidebar"] button[kind="secondaryFormSubmit"]:focus {{
+    outline: 2px solid #f97316 !important;
+    outline-offset: 2px !important;
+}}
+
+/* ── Bouton ouverture/fermeture de sidebar : solution radicale ──
+   Streamlit 1.49 utilise un SVG avec des paths qui ignorent fill/stroke CSS.
+   On masque l'icone native et on injecte un caractere unicode visible via ::before.
+*/
+
+/* Conteneur du bouton (fond orange vif, format carre arrondi) */
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="stSidebarCollapseButton"] {{
+    background-color: #f97316 !important;
+    border: 2px solid #f97316 !important;
+    border-radius: 8px !important;
+    width: 42px !important;
+    height: 42px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 2px 8px rgba(249,115,22,0.5);
+    z-index: 999999 !important;
+    position: relative;
+}}
+
+/* Le bouton interne herite du conteneur */
+[data-testid="stSidebarCollapsedControl"] button,
+[data-testid="stSidebarCollapseButton"] button,
+button[kind="header"],
+button[kind="headerNoPadding"] {{
+    background-color: #f97316 !important;
+    border: none !important;
+    color: #ffffff !important;
+    width: 100% !important;
+    height: 100% !important;
+    padding: 0 !important;
+}}
+
+/* On cache TOTALEMENT le SVG natif (impossible a coloriser fiablement) */
+[data-testid="stSidebarCollapsedControl"] svg,
+[data-testid="stSidebarCollapseButton"] svg,
+button[kind="header"] svg,
+button[kind="headerNoPadding"] svg {{
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+}}
+
+/* Injection d'un caractere unicode visible en remplacement
+   - "Collapsed" (sidebar fermee) -> hamburger pour OUVRIR
+   - "Collapse"  (sidebar ouverte) -> croix pour FERMER */
+[data-testid="stSidebarCollapsedControl"] button::before,
+button[kind="headerNoPadding"]::before {{
+    content: "☰";
+    color: #ffffff !important;
+    font-size: 22px !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    pointer-events: none;
+}}
+[data-testid="stSidebarCollapseButton"] button::before,
+button[kind="header"]::before {{
+    content: "✕";
+    color: #ffffff !important;
+    font-size: 18px !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    pointer-events: none;
+}}
+
+/* Hover : orange plus sombre + leger zoom */
+[data-testid="stSidebarCollapsedControl"]:hover,
+[data-testid="stSidebarCollapseButton"]:hover {{
+    background-color: #ea580c !important;
+    transform: scale(1.05);
+    transition: transform 0.15s ease;
+}}
+
 /* ── Sidebar : carte "Connecté" avec accent orange ── */
 .connected-card {{
     background: rgba(249,115,22,0.12);
@@ -706,6 +803,93 @@ input:focus-visible,
 .field-label {{ color: #cbd5e1 !important; }}
 </style>
 """, unsafe_allow_html=True)
+
+# ── JS : force le styling du bouton sidebar (Streamlit re-injecte ses styles
+#        apres quelques secondes, ce qui ecrase notre CSS). On utilise un
+#        MutationObserver + re-application periodique pour le maintenir. ──
+st.markdown(
+    """
+<img src="" onerror='(function(){
+  var SELECTORS = [
+    "[data-testid=\\"stSidebarCollapsedControl\\"]",
+    "[data-testid=\\"stSidebarCollapseButton\\"]"
+  ];
+  function applyStyle() {
+    SELECTORS.forEach(function(sel) {
+      document.querySelectorAll(sel).forEach(function(el) {
+        Object.assign(el.style, {
+          backgroundColor: "#f97316",
+          border: "2px solid #f97316",
+          borderRadius: "8px",
+          width: "42px",
+          height: "42px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: "0 2px 8px rgba(249,115,22,0.5)",
+          zIndex: "999999"
+        });
+        el.querySelectorAll("svg").forEach(function(svg) {
+          svg.style.display = "none";
+        });
+        el.querySelectorAll("button").forEach(function(btn) {
+          Object.assign(btn.style, {
+            backgroundColor: "transparent",
+            border: "none",
+            width: "100%",
+            height: "100%",
+            padding: "0",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#ffffff"
+          });
+        });
+        if (!el.querySelector(".routezone-arrow-icon")) {
+          var isCollapsed = el.matches("[data-testid=\\"stSidebarCollapsedControl\\"]");
+          var icon = document.createElement("span");
+          icon.className = "routezone-arrow-icon";
+          icon.textContent = isCollapsed ? "\\u2630" : "\\u2715";
+          Object.assign(icon.style, {
+            color: "#ffffff",
+            fontSize: isCollapsed ? "22px" : "18px",
+            fontWeight: "700",
+            lineHeight: "1",
+            pointerEvents: "none"
+          });
+          var target = el.querySelector("button") || el;
+          target.appendChild(icon);
+        }
+      });
+    });
+  }
+  // 1) Application immediate + ressayer au demarrage (au cas ou DOM pas pret)
+  applyStyle();
+  var attempts = 0;
+  var initInterval = setInterval(function() {
+    applyStyle();
+    attempts++;
+    if (attempts > 40) clearInterval(initInterval);
+  }, 250);
+  // 2) MutationObserver : reagit a tout changement DOM Streamlit
+  var observer = new MutationObserver(function() {
+    observer.disconnect();
+    applyStyle();
+    observer.observe(document.body, {
+      childList: true, subtree: true,
+      attributes: true, attributeFilter: ["style", "class"]
+    });
+  });
+  observer.observe(document.body, {
+    childList: true, subtree: true,
+    attributes: true, attributeFilter: ["style", "class"]
+  });
+  // 3) Filet de securite : re-application periodique
+  setInterval(applyStyle, 2000);
+})()' style="display:none" />
+""",
+    unsafe_allow_html=True,
+)
 
 # ── HERO ─────────────────────────────────────────────────────────────────────
 st.markdown(f"""
@@ -827,19 +1011,37 @@ with col2:
 
     st.markdown(field_label("shield", "Équipement de sécurité", required=True), unsafe_allow_html=True)
     st.markdown('<div style="font-size:0.72rem;color:#475569;margin-bottom:4px;">Sélectionnez tout ce qui s\'applique</div>', unsafe_allow_html=True)
-    secu_choices = st.multiselect("Équipement de sécurité",
-        options=[0,1,2,3,4,5,6,7,9],
+
+    # Exclusivite de "Aucun" (0) :
+    #  - Si l'user clique "Aucun" alors que d'autres options sont cochees -> garde uniquement "Aucun"
+    #  - Si l'user coche une autre option alors que "Aucun" est present  -> retire "Aucun"
+    def _exclusivite_aucun_secu():
+        val = st.session_state.secu_multi
+        prev = st.session_state.get("secu_multi_prev", [])
+        if 0 in val and len(val) > 1:
+            if 0 not in prev:
+                # "Aucun" vient d'etre ajoute -> tout les autres degagent
+                st.session_state.secu_multi = [0]
+            else:
+                # Autre option vient d'etre ajoutee alors qu'Aucun etait deja la -> retirer Aucun
+                st.session_state.secu_multi = [x for x in val if x != 0]
+        st.session_state.secu_multi_prev = list(st.session_state.secu_multi)
+
+    secu_choices = st.multiselect(
+        "Équipement de sécurité",
+        options=[0, 1, 2, 3, 4, 5, 6, 7, 9],
         default=[0],
         label_visibility="collapsed",
         format_func=lambda x: {
-            0:"Aucun", 1:"Ceinture", 2:"Casque",
-            3:"Siège enfant", 4:"Gilet réfléchissant",
-            5:"Airbag moto", 6:"Gants moto",
-            7:"Gants + Airbag moto", 9:"Autre"}[x])
-    # On garde le premier équipement coché pour le modèle (secu1)
-    # Si "Aucun" est parmi les choix avec d'autres, on retire Aucun
-    if len(secu_choices) > 1 and 0 in secu_choices:
-        secu_choices = [x for x in secu_choices if x != 0]
+            0: "Aucun", 1: "Ceinture", 2: "Casque",
+            3: "Siège enfant", 4: "Gilet réfléchissant",
+            5: "Airbag moto", 6: "Gants moto",
+            7: "Gants + Airbag moto", 9: "Autre",
+        }[x],
+        key="secu_multi",
+        on_change=_exclusivite_aucun_secu,
+    )
+    # 1er equipement coche transmis au modele
     secu1 = secu_choices[0] if secu_choices else 0
 
     st.markdown(field_label("compass", "Motif du déplacement", required=True), unsafe_allow_html=True)
@@ -1183,14 +1385,19 @@ if st.session_state.last_result and st.session_state.last_routes and st.session_
         is_pomp = route["type"] == "pompiers"
         is_best = route["nom"] in (best_pomp_nom, best_sau_nom)
 
+        # Protection NaN / None / float -> string propre pour l'affichage
+        nom_route = str(route.get("nom") or "Route inconnue")
+        if nom_route.lower() in ("nan", "none", ""):
+            nom_route = "Route inconnue"
+
         # Couleurs distinctes : pompiers = orange, SAU = bleu
         if is_pomp:
             line_color = "#f97316"
-            tooltip_lbl = f"🚒 {route['nom']}"
+            tooltip_lbl = f"🚒 {nom_route}"
             arrow_label = f"🚒 Pompier &rarr; accident ({route['duration_min']} min)"
         else:
             line_color = "#1e40af"
-            tooltip_lbl = f"🏥 {route['nom']}"
+            tooltip_lbl = f"🏥 {nom_route}"
             arrow_label = f"🏥 Accident &rarr; SAU ({route['duration_min']} min)"
 
         weight = 6 if is_best else 3
@@ -1206,7 +1413,7 @@ if st.session_state.last_result and st.session_state.last_routes and st.session_
             fill=True,
             fillColor=line_color,
             fillOpacity=1.0,
-            popup=f"<b>{route['nom'][:40]}</b><br/>{route['distance_km']} km | {route['duration_min']} min",
+            popup=f"<b>{nom_route[:40]}</b><br/>{route['distance_km']} km | {route['duration_min']} min",
             tooltip=tooltip_lbl,
         ).add_to(m)
 
