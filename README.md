@@ -171,6 +171,9 @@ flowchart TB
 
 ## Golden Hour
 
+**Rappel définition**
+L'heure d'or est un concept de médecine d'urgence. La plupart des blessés graves (polytraumatisé, ou bien victime d'une hémorragie interne) meurent dans les premières heures. On a donc un taux de survie optimal si la victime se retrouve sur une table d'opération dans l'heure qui suit l'accident.
+
 Correlation prouvee entre temps d'intervention et deces (72 123 blesses graves).
 
 **V2 Haversine x 1.3** (approximation) :

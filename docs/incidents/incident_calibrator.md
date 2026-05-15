@@ -198,6 +198,73 @@ Une amélioration future pourrait consister à tester :
 - Un ajustement manuel du seuil de décision (threshold tuning) après 
   calibration pour rétablir le Recall
 
+---
+
+## 4 bis. Investigation post-mortem — Test d'approches alternatives
+
+Suite à la résolution de l'incident (désactivation du calibrator), une investigation complémentaire a été menée pour explorer des alternatives. L'objectif : déterminer si une variante de calibration aurait pu être conservée en production sans dégrader le Recall métier.
+
+### Hypothèses testées
+
+**Hypothèse n°1** : le calibrator initial utilisait `cv=3`, ce qui re-entraîne le modèle 3 fois en cross-validation. Cette ré-entraînement aurait pu mal propager le paramètre `class_weight='balanced'`. Tester `cv='prefit'` devrait préserver le modèle pondéré.
+
+**Hypothèse n°2** : la méthode "isotonic" est très flexible mais peut sur-corriger. La méthode "sigmoid" (Platt scaling) est plus rigide et pourrait être plus adaptée.
+
+**Hypothèse n°3** : si la calibration dégrade le Recall au seuil 0.5, un ajustement du seuil de décision (threshold tuning) pourrait compenser.
+
+### Méthodologie
+
+Script `test_calibrator_alternatives.py` (exécution standalone, ~100 secondes) reproduisant le split temporel de `notebook_07` :
+- Train : 225 304 accidents (2022-2023, hors validation)
+- Validation : 39 760 accidents (15% du train, pour calibrer)
+- Test : 148 506 accidents 2024 entier
+
+Quatre modèles évalués sur le même test set :
+1. LightGBM brut V3 OSRM (référence)
+2. CalibratedClassifierCV(model, cv='prefit', method='isotonic')
+3. CalibratedClassifierCV(model, cv='prefit', method='sigmoid')
+4. Calibrator existant cv=3 isotonic (pour comparaison)
+
+Threshold tuning testé sur chaque calibrator : seuils 0.25, 0.30, 0.35, 0.40, 0.45, 0.50.
+
+### Résultats — Comparaison au seuil standard 0.5
+
+| Approche | Recall GRAVE | Precision GRAVE | F1 macro | AUC-ROC | Accuracy |
+|---|---:|---:|---:|---:|---:|
+| **Brut (V3 OSRM)** | **0.7643** | 0.4166 | 0.6956 | 0.8558 | 0.7760 |
+| Prefit + isotonic | 0.3887 | 0.6296 | 0.6985 | 0.8556 | 0.8559 |
+| Prefit + sigmoid (Platt) | 0.4292 | 0.6063 | 0.7086 | 0.8558 | 0.8543 |
+| Existant cv=3 isotonic | 0.3299 | 0.6504 | 0.6772 | 0.8458 | 0.8547 |
+
+### Constats
+
+**1. L'hypothèse n°1 est réfutée empiriquement.** Même avec `cv='prefit'` qui préserve `class_weight='balanced'`, le Recall reste dégradé (0.39 isotonic, 0.43 sigmoid). Le ré-entraînement n'est pas la cause principale du problème.
+
+**2. La vraie cause identifiée est la nature de la calibration elle-même.** Sur un dataset déséquilibré (17% GRAVE), la calibration re-mappe les scores empiriquement et concentre les probabilités autour de 0.3-0.4. Le seuil standard de 0.5 devient alors trop strict pour la classe minoritaire.
+
+**3. L'AUC-ROC est préservé** (0.8558 vs 0.8556 vs 0.8558), ce qui confirme que **la qualité du classement** des prédictions reste excellente. Seul le point de coupure à 0.5 perd en pertinence après calibration.
+
+### Threshold tuning — Récupération partielle possible
+
+| Calibrator | Seuil optimal | Recall | Precision | F1 macro |
+|---|---:|---:|---:|---:|
+| Cv=3 isotonic | 0.25 | 0.6602 | 0.4589 | 0.7101 |
+| Prefit isotonic | 0.25 | 0.7149 | 0.4465 | 0.7102 |
+| **Prefit sigmoid** | **0.35** | 0.5910 | 0.5173 | **0.7254** ⭐ |
+
+**Constat** : aucune combinaison calibration + threshold ne dépasse le Recall du modèle brut au seuil 0.5 (0.7643). Le meilleur F1 macro est obtenu avec prefit sigmoid @ seuil 0.35 (0.7254, +3 points), mais au prix d'une perte de 17 points de Recall — non acceptable pour le cas d'usage sécurité routière.
+
+### Conclusion de l'investigation
+
+**Décision confirmée** : conserver le modèle brut V3 OSRM en production.
+
+Le test exhaustif de 4 approches × 6 seuils (24 configurations) démontre que pour ce cas d'usage spécifique :
+- La priorité métier est le Recall sur la classe GRAVE (détecter les accidents graves)
+- Aucune calibration n'améliore cette métrique au seuil 0.5
+- L'arbitrage F1 (prefit sigmoid @ 0.35) sacrifie trop de Recall pour être adapté
+
+**Suite envisageable** : si dans une version ultérieure du projet on souhaite afficher des probabilités empiriquement plus interprétables à l'utilisateur (par exemple "67% de risque calibré sur les statistiques observées"), prefit sigmoid + seuil 0.35 serait l'option à privilégier, en assumant le compromis vers le F1.
+
 ## 5. Solution appliquée
 
 ### 5.1 Décision
