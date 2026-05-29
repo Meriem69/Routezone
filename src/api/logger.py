@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 
 # Creer le dossier logs/ s'il n'existe pas
-LOG_DIR = Path(__file__).parent.parent.parent / "logs"
+LOG_DIR = Path(__file__).parent / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 LOG_FILE = LOG_DIR / "api.log"
 
