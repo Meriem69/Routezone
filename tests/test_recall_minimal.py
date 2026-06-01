@@ -224,7 +224,7 @@ def test_recall_metier_cas_extremes():
         proba = float(prediction.get("probability", 0.0))
 
         # Un cas est "correct" si label = GRAVE ET proba >= seuil
-        est_correct = (label == "Grave") and (proba >= PROBA_MIN)
+        est_correct = (label.upper() == "GRAVE") and (proba >= PROBA_MIN)
         if est_correct:
             nb_corrects += 1
 
