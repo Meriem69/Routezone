@@ -24,7 +24,6 @@ optuna==3.6.1
 imbalanced-learn==0.12.4
 joblib==1.5.3
 mlflow==3.10.0
-shap>=0.46.0
 
 # === Visualisation ===
 matplotlib==3.10.8
