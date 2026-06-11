@@ -133,6 +133,9 @@ C'est pourquoi mon projet utilise les métriques suivantes (test 2024, 148 506 a
 
 Modèle utilisé : LightGBM V3 OSRM, fichier `best_model_v3_osrm.pkl`, entraîné sur BAAC 2022-2023, testé sur BAAC 2024 entier.
 
+
+
+
 ---
 
 ## Mon dispositif de veille
