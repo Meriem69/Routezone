@@ -1,0 +1,14 @@
+# A placer dans : monitoring/grafana/provisioning/dashboards/dashboards.yml
+# Dit a Grafana de charger tous les .json trouves dans le dossier monte.
+apiVersion: 1
+
+providers:
+  - name: RouteZone
+    orgId: 1
+    folder: RouteZone
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/grafana-dashboards

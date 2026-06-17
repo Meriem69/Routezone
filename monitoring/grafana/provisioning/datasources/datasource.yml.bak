@@ -1,0 +1,13 @@
+# A placer dans : monitoring/grafana/provisioning/datasources/datasource.yml
+# Declare automatiquement la source Prometheus au demarrage du conteneur Grafana.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: aflnp3t498jy8e
+    access: proxy
+    # Nom du service Prometheus dans ton docker-compose (adapte si different).
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true

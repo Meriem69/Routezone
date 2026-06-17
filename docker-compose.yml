@@ -30,27 +30,9 @@ services:
     image: ghcr.io/project-osrm/osrm-backend
     container_name: routezone_osrm_prepare
     volumes:
-      - osrm_data:/data
+      - ./osrm_data:/data
     entrypoint: /bin/sh
-    command: >
-      -c "
-      if [ ! -f /data/france-latest.osm.pbf ]; then
-        echo 'Telechargement France (~4 Go)...' &&
-        apk add --no-cache wget &&
-        wget -q --show-progress -O /data/france-latest.osm.pbf https://download.geofabrik.de/europe/france-latest.osm.pbf;
-      fi &&
-      if [ ! -f /data/france-latest.osrm ]; then
-        echo 'Extraction...' &&
-        osrm-extract -p /opt/car.lua /data/france-latest.osm.pbf &&
-        echo 'Partition...' &&
-        osrm-partition /data/france-latest.osrm &&
-        echo 'Customisation...' &&
-        osrm-customize /data/france-latest.osrm &&
-        echo 'OSRM pret !';
-      else
-        echo 'Donnees OSRM deja preparees.';
-      fi
-      "
+    command: -c "osrm-routed --algorithm mld /data/rhone-alpes-latest.osrm"
     profiles:
       - prepare
 
@@ -58,10 +40,10 @@ services:
     image: ghcr.io/project-osrm/osrm-backend
     container_name: routezone_osrm
     volumes:
-      - osrm_data:/data
+      - ./osrm_data:/data
     ports:
       - "5000:5000"
-    command: osrm-routed --algorithm mld /data/france-latest.osrm
+    command: osrm-routed --algorithm mld /data/rhone-alpes-latest.osrm
     restart: unless-stopped
 
   # ── API unifiee (donnees + IA + auth) ──────────────────────────
@@ -111,6 +93,8 @@ services:
       -   "3000:3000"   
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/grafana-dashboards
     env_file:
       - .env
     environment:
