@@ -1,4 +1,4 @@
-name: Tests RouteZone
+name: CI/CD RouteZone
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     services:
       postgres:
         image: postgres:16-alpine
@@ -23,28 +23,52 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
-      
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      
+
       - name: Import data into PostgreSQL
         env:
           DATABASE_URL: postgresql://routezone:routezone_pwd_2024@localhost:5432/routezone
         run: python bdd/import_data.py
-      
+
       - name: Run pytest
         env:
           DATABASE_URL: postgresql://routezone:routezone_pwd_2024@localhost:5432/routezone
         run: pytest tests/ -v --tb=short
+
+  build-and-push:
+    needs: test            # ne se lance QUE si les 35 tests passent
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/meriem69/routezone:latest
