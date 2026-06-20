@@ -241,9 +241,9 @@ Optuna existent dans le repo mais ne sont pas servies par l'API.
 
 | Approche | Recall | AUC | Gap train-test | Verdict |
 |---|---:|---:|---:|---|
-| V3 vanilla (defaults) | 0.7591 | 0.8554 | +9.7% | Leger overfit |
-| V3 Optuna scoring=AUC | 0.7397 | 0.8544 | +14.5% | Pire (AUC ne penalise pas le gap) |
-| **V3 Optuna scoring=recall + early stopping** | **0.7802** | **0.8569** | **+4.25%** | **Retenu** |
+| **V3 OSRM (best_model_v3_osrm.pkl)** | **0.7643** | **0.8558** | -- | **Servi en production** |
+| V3 Optuna scoring=AUC | 0.7397 | 0.8544 | +14.5% | Non servi (AUC ne penalise pas le gap) |
+| V3 Optuna scoring=recall + early stopping | 0.7802 | 0.8569 | +4.25% | Meilleur recall, non servi |
 
 Hyperparametres V3 final : `max_depth=9`, `learning_rate=0.012`, `num_leaves=45`,
 `min_child_samples=153`, `subsample=0.74`, `colsample_bytree=0.65`,
@@ -506,31 +506,36 @@ pytest tests/ -v                  # Tests
 
 ---
 
+
+## CI/CD
+
+A chaque push sur `master`, GitHub Actions execute les 35 tests sur un service PostgreSQL 16. Si les tests passent, l'image Docker de l'API est automatiquement construite et publiee sur le registre GitHub (GHCR) : `ghcr.io/meriem69/routezone:latest`. Le packaging et la livraison de l'image sont donc automatises ; le deploiement continu sur serveur distant reste la prochaine etape.
+
+---
+
 ## Competences RNCP37827
 
-| Code | Competence | Livrable |
-|------|-----------|---------|
-| C1 | Automatiser l'extraction de donnees | notebooks 01-04 |
-| C2 | Identifier les sources fiables | notebooks 01-04 |
-| C3 | Nettoyer et transformer les donnees | notebooks 01-04 |
-| C4 | Creer une base de donnees | bdd/create_db.sql, PostgreSQL |
-| C5 | Developper une API REST | src/api/routes_data.py |
-| C6 | Organiser une veille technologique | docs/actualite.md |
-| C7 | Benchmark et recommandation | rapport E2 (en cours) |
-| C8 | Parametrer un service IA | notebooks 05-08, models/ |
-| C9 | Developper un modele ML | notebook 07 (LightGBM V3 OSRM) |
-| C10 | Encapsuler le modele dans une API | src/api/routes_ia.py |
-| C11 | Tester le modele | tests/test_business_logic.py |
-| C12 | Tests automatises | tests/ (34 tests pytest) |
-| C13 | CI/CD du modele | .github/workflows/tests.yml |
-| C14 | Specifications fonctionnelles | docs/SPECS.md (en cours) |
-| C15 | Architecture applicative | README.md (schemas Mermaid) |
-| C16 | Methodologie agile | rapport E4 (en cours) |
-| C17 | Accessibilite et securite | RGAA + JWT + RGPD |
-| C18 | Tester l'application | tests/ (34 tests) |
-| C19 | Integrer l'IA dans l'application | src/app.py (Streamlit) |
-| C20 | Monitoring applicatif | monitoring/ (Prometheus + Grafana) |
-| C21 | Resolution d'incident | docs/incidents/ (en cours) |
+| C1 | Automatiser l'extraction des donnees | notebooks 01-04, import_data.py |
+| C2 | Developper les requetes SQL d'extraction | bdd/ |
+| C3 | Nettoyer et agreger les donnees | notebook 01, pipeline de nettoyage |
+| C4 | Creer la base de donnees (Merise + RGPD) | bdd/create_db.sql, PostgreSQL |
+| C5 | Developper l'API REST de donnees | src/api/routes_data.py |
+| C6 | Veille technique et reglementaire | docs/actualite.md, rapport E2 |
+| C7 | Benchmark des services d'IA | rapport E2 |
+| C8 | Parametrer le service d'IA | docker/, models/ |
+| C9 | Developper l'API exposant le modele | src/api/routes_ia.py |
+| C10 | Integrer l'API du modele dans l'application | src/app.py |
+| C11 | Monitorer le modele (MLOps) | MLflow, monitoring/ |
+| C12 | Tests automatises du modele | tests/ (35 tests pytest) |
+| C13 | Chaine de livraison continue du modele | .github/workflows/, GHCR |
+| C14 | Analyser le besoin (specs, user stories) | rapport E4 |
+| C15 | Concevoir le cadre technique (architecture) | README.md (schemas Mermaid) |
+| C16 | Coordonner en methode agile | rapport E4 |
+| C17 | Developper composants/interfaces (accessibilite, OWASP) | src/app.py, RGAA |
+| C18 | Automatiser les tests du code (CI) | .github/workflows/ |
+| C19 | Livraison continue de l'application (Docker) | docker/, GHCR |
+| C20 | Surveiller l'application | monitoring/ (Prometheus + Grafana) |
+| C21 | Resoudre un incident technique | rapport E5 |
 
 ---
 
